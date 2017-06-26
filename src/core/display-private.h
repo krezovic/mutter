@@ -267,14 +267,8 @@ struct _MetaDisplay
   MetaAlarmFilter alarm_filter;
   gpointer alarm_filter_data;
 
-  int composite_event_base;
-  int composite_error_base;
-  int composite_major_version;
-  int composite_minor_version;
   int damage_event_base;
   int damage_error_base;
-  int xfixes_event_base;
-  int xfixes_error_base;
   int xinput_error_base;
   int xinput_event_base;
   int xinput_opcode;
@@ -291,9 +285,7 @@ struct _MetaDisplay
 #define META_DISPLAY_HAS_XSYNC(display) ((display)->have_xsync)
   unsigned int have_shape : 1;
 #define META_DISPLAY_HAS_SHAPE(display) ((display)->have_shape)
-  unsigned int have_composite : 1;
   unsigned int have_damage : 1;
-#define META_DISPLAY_HAS_COMPOSITE(display) ((display)->have_composite)
 #define META_DISPLAY_HAS_DAMAGE(display) ((display)->have_damage)
 #ifdef HAVE_XI23
   gboolean have_xinput_23 : 1;

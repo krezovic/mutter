@@ -40,6 +40,7 @@
 #include <meta/barrier.h>
 #include "backends/x11/meta-barrier-x11.h"
 #include "display-private.h"
+#include "x11/display-x11-private.h"
 
 struct _MetaBarrierImplX11Private
 {
@@ -67,9 +68,9 @@ _meta_barrier_impl_x11_release (MetaBarrierImpl  *impl,
   MetaBarrierImplX11 *self = META_BARRIER_IMPL_X11 (impl);
   MetaBarrierImplX11Private *priv =
     meta_barrier_impl_x11_get_instance_private (self);
-  MetaDisplay *display = priv->barrier->priv->display;
+  MetaX11Display *display = priv->barrier->priv->display->x11_display;
 
-  if (META_DISPLAY_HAS_XINPUT_23 (display))
+  if (META_X11_DISPLAY_HAS_XINPUT_23 (display))
     {
       XIBarrierReleasePointer (display->xdisplay,
                                META_VIRTUAL_CORE_POINTER_ID,

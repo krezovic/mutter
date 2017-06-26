@@ -38,4 +38,11 @@ typedef struct _MetaX11DisplayClass MetaX11DisplayClass;
 
 GType meta_x11_display_get_type (void) G_GNUC_CONST;
 
+int meta_x11_display_get_xinput_opcode (MetaX11Display *display);
+
+gboolean meta_x11_display_has_shape (MetaX11Display *display);
+
+int meta_x11_display_get_damage_event_base (MetaX11Display *display);
+int meta_x11_display_get_shape_event_base (MetaX11Display *display);
+
 #endif

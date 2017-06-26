@@ -39,6 +39,7 @@
 #include "meta-xwayland-private.h"
 #include "meta-xwayland-selection-private.h"
 #include "meta-wayland-data-device.h"
+#include "x11/display-x11-private.h"
 
 #define INCR_CHUNK_SIZE (128 * 1024)
 #define XDND_VERSION 5
@@ -1673,7 +1674,7 @@ meta_xwayland_selection_handle_event (XEvent *xevent)
       return meta_xwayland_selection_handle_client_message (compositor, xevent);
     default:
       {
-        MetaDisplay *display = meta_get_display ();
+        MetaX11Display *display = meta_get_x11_display ();
 
         if (xevent->type - display->xfixes_event_base == XFixesSelectionNotify)
           return meta_xwayland_selection_handle_xfixes_selection_notify (compositor, xevent);

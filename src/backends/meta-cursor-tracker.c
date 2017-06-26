@@ -44,6 +44,8 @@
 
 #include "meta-backend-private.h"
 
+#include "x11/display-x11-private.h"
+
 G_DEFINE_TYPE (MetaCursorTracker, meta_cursor_tracker, G_TYPE_OBJECT);
 
 enum {
@@ -165,7 +167,7 @@ gboolean
 meta_cursor_tracker_handle_xevent (MetaCursorTracker *tracker,
                                    XEvent            *xevent)
 {
-  MetaDisplay *display = meta_get_display ();
+  MetaX11Display *display = meta_get_x11_display ();
   XFixesCursorNotifyEvent *notify_event;
 
   if (meta_is_wayland_compositor ())
@@ -187,7 +189,7 @@ meta_cursor_tracker_handle_xevent (MetaCursorTracker *tracker,
 static void
 ensure_xfixes_cursor (MetaCursorTracker *tracker)
 {
-  MetaDisplay *display = meta_get_display ();
+  MetaX11Display *display = meta_get_x11_display ();
   XFixesCursorImage *cursor_image;
   CoglTexture2D *sprite;
   guint8 *cursor_data;
