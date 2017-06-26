@@ -187,12 +187,6 @@ meta_x11_display_open (MetaDisplay *display)
 #include <x11/atomnames.h>
 #undef item
 
-  i = 0;
-/* XXX: Transitional */
-#define item(x) display->atom_##x = atoms[i++];
-#include <x11/atomnames.h>
-#undef item
-
   meta_bell_init (x11_display);
 
   meta_prefs_add_listener (prefs_changed_callback, x11_display);

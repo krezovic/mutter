@@ -549,7 +549,6 @@ gboolean
 meta_display_open (void)
 {
   MetaDisplay *display;
-  Display *xdisplay;
   MetaScreen *screen;
   int i;
   guint32 timestamp;
@@ -605,32 +604,7 @@ meta_display_open (void)
   meta_x11_display_open (display);
   g_assert (display->x11_display != NULL);
 
-  /* XXX: Transitional */
-  xdisplay = display->x11_display->xdisplay;
-  display->name = display->x11_display->name;
-  display->xdisplay = xdisplay;
-
   timestamp = display->x11_display->timestamp;
-
-  /* XXX: Transitional */
-  {
-    display->xsync_error_base = display->x11_display->xsync_error_base;
-    display->xsync_event_base = display->x11_display->xsync_event_base;
-    display->have_xsync = display->x11_display->have_xsync;
-
-    display->shape_error_base = display->x11_display->shape_error_base;
-    display->shape_event_base = display->x11_display->shape_event_base;
-    display->have_shape = display->x11_display->have_shape;
-
-    display->damage_error_base = display->x11_display->damage_error_base;
-    display->damage_event_base = display->x11_display->damage_event_base;
-    display->have_damage = display->x11_display->have_damage;
-
-    display->xinput_opcode = display->x11_display->xinput_opcode;
-    display->xinput_error_base = display->x11_display->xinput_error_base;
-    display->xinput_event_base = display->x11_display->xinput_event_base;
-    display->have_xinput_23 = display->x11_display->have_xinput_23;
-  }
 
   display->last_user_time = timestamp;
   display->compositor = NULL;

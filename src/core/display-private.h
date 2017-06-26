@@ -105,17 +105,7 @@ struct _MetaDisplay
 
   MetaX11Display *x11_display;
 
-  char *name;
-  Display *xdisplay;
-
   int clutter_event_filter;
-
-  /* Pull in all the names of atoms as fields; we will intern them when the
-   * class is constructed.
-   */
-#define item(x)  Atom atom_##x;
-#include <x11/atomnames.h>
-#undef item
 
   /* Our best guess as to the "currently" focused window (that is, the
    * window that we expect will be focused at the point when the X
@@ -228,32 +218,9 @@ struct _MetaDisplay
   MetaGestureTracker *gesture_tracker;
   ClutterEventSequence *pointer_emulating_sequence;
 
-  int damage_event_base;
-  int damage_error_base;
-  int xinput_error_base;
-  int xinput_event_base;
-  int xinput_opcode;
-
   ClutterActor *current_pad_osd;
 
   MetaStartupNotification *startup_notification;
-
-  int xsync_event_base;
-  int xsync_error_base;
-  int shape_event_base;
-  int shape_error_base;
-  unsigned int have_xsync : 1;
-#define META_DISPLAY_HAS_XSYNC(display) ((display)->have_xsync)
-  unsigned int have_shape : 1;
-#define META_DISPLAY_HAS_SHAPE(display) ((display)->have_shape)
-  unsigned int have_damage : 1;
-#define META_DISPLAY_HAS_DAMAGE(display) ((display)->have_damage)
-#ifdef HAVE_XI23
-  gboolean have_xinput_23 : 1;
-#define META_DISPLAY_HAS_XINPUT_23(display) ((display)->have_xinput_23)
-#else
-#define META_DISPLAY_HAS_XINPUT_23(display) FALSE
-#endif /* HAVE_XI23 */
 };
 
 struct _MetaDisplayClass

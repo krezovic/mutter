@@ -2857,9 +2857,9 @@ handle_panel (MetaDisplay     *display,
   meta_error_trap_push ();
 
   /* Release the grab for the panel before sending the event */
-  XUngrabKeyboard (display->xdisplay, event->time);
+  XUngrabKeyboard (display->x11_display->xdisplay, event->time);
 
-  XSendEvent (display->xdisplay,
+  XSendEvent (display->x11_display->xdisplay,
 	      screen->xroot,
 	      False,
 	      StructureNotifyMask,

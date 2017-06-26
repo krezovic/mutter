@@ -656,7 +656,7 @@ meta_window_x11_unmanage (MetaWindow *window)
       window->user_time_window = None;
     }
 
-  if (META_DISPLAY_HAS_SHAPE (window->display))
+  if (META_X11_DISPLAY_HAS_SHAPE (window->display->x11_display))
     XShapeSelectInput (XDISPLAY(window), window->xwindow, NoEventMask);
 
   meta_window_ungrab_keys (window);
@@ -683,7 +683,7 @@ meta_window_x11_ping (MetaWindow *window,
 {
   MetaDisplay *display = window->display;
 
-  send_icccm_message (window, display->atom__NET_WM_PING, serial);
+  send_icccm_message (window, display->x11_display->atom__NET_WM_PING, serial);
 }
 
 static void
@@ -729,7 +729,7 @@ request_take_focus (MetaWindow *window,
   meta_topic (META_DEBUG_FOCUS, "WM_TAKE_FOCUS(%s, %u)\n",
               window->desc, timestamp);
 
-  send_icccm_message (window, display->atom_WM_TAKE_FOCUS, timestamp);
+  send_icccm_message (window, display->x11_display->atom_WM_TAKE_FOCUS, timestamp);
 }
 
 static void
@@ -1726,7 +1726,7 @@ meta_window_x11_update_input_region (MetaWindow *window)
       return;
     }
 
-  if (META_DISPLAY_HAS_SHAPE (window->display))
+  if (META_X11_DISPLAY_HAS_SHAPE (window->display->x11_display))
     {
       /* Translate the set of XShape rectangles that we
        * get from the X server to a cairo_region. */
@@ -1828,7 +1828,7 @@ meta_window_x11_update_shape_region (MetaWindow *window)
   MetaWindowX11Private *priv = meta_window_x11_get_instance_private (window_x11);
   cairo_region_t *region = NULL;
 
-  if (META_DISPLAY_HAS_SHAPE (window->display))
+  if (META_X11_DISPLAY_HAS_SHAPE (window->display->x11_display))
     {
       /* Translate the set of XShape rectangles that we
        * get from the X server to a cairo_region. */
@@ -2177,7 +2177,7 @@ process_property_notify (MetaWindow     *window,
       XFree (property_name);
     }
 
-  if (event->atom == window->display->atom__NET_WM_USER_TIME &&
+  if (event->atom == window->display->x11_display->atom__NET_WM_USER_TIME &&
       window->user_time_window)
     {
         xid = window->user_time_window;
@@ -2248,7 +2248,7 @@ meta_window_x11_client_message (MetaWindow *window,
     }
 
   if (event->xclient.message_type ==
-      display->atom__NET_CLOSE_WINDOW)
+      display->x11_display->atom__NET_CLOSE_WINDOW)
     {
       guint32 timestamp;
 
@@ -2268,7 +2268,7 @@ meta_window_x11_client_message (MetaWindow *window,
       return TRUE;
     }
   else if (event->xclient.message_type ==
-           display->atom__NET_WM_DESKTOP)
+           display->x11_display->atom__NET_WM_DESKTOP)
     {
       int space;
       MetaWorkspace *workspace;
@@ -2295,7 +2295,7 @@ meta_window_x11_client_message (MetaWindow *window,
       return TRUE;
     }
   else if (event->xclient.message_type ==
-           display->atom__NET_WM_STATE)
+           display->x11_display->atom__NET_WM_STATE)
     {
       gulong action;
       Atom first;
@@ -2311,12 +2311,12 @@ meta_window_x11_client_message (MetaWindow *window,
           char *str2;
 
           meta_error_trap_push ();
-          str1 = XGetAtomName (display->xdisplay, first);
+          str1 = XGetAtomName (display->x11_display->xdisplay, first);
           if (meta_error_trap_pop_with_return () != Success)
             str1 = NULL;
 
           meta_error_trap_push ();
-          str2 = XGetAtomName (display->xdisplay, second);
+          str2 = XGetAtomName (display->x11_display->xdisplay, second);
           if (meta_error_trap_pop_with_return () != Success)
             str2 = NULL;
 
@@ -2329,8 +2329,8 @@ meta_window_x11_client_message (MetaWindow *window,
           meta_XFree (str2);
         }
 
-      if (first == display->atom__NET_WM_STATE_SHADED ||
-          second == display->atom__NET_WM_STATE_SHADED)
+      if (first == display->x11_display->atom__NET_WM_STATE_SHADED ||
+          second == display->x11_display->atom__NET_WM_STATE_SHADED)
         {
           gboolean shade;
           guint32 timestamp;
@@ -2349,8 +2349,8 @@ meta_window_x11_client_message (MetaWindow *window,
             meta_window_unshade (window, timestamp);
         }
 
-      if (first == display->atom__NET_WM_STATE_FULLSCREEN ||
-          second == display->atom__NET_WM_STATE_FULLSCREEN)
+      if (first == display->x11_display->atom__NET_WM_STATE_FULLSCREEN ||
+          second == display->x11_display->atom__NET_WM_STATE_FULLSCREEN)
         {
           gboolean make_fullscreen;
 
@@ -2362,10 +2362,10 @@ meta_window_x11_client_message (MetaWindow *window,
             meta_window_unmake_fullscreen (window);
         }
 
-      if (first == display->atom__NET_WM_STATE_MAXIMIZED_HORZ ||
-          second == display->atom__NET_WM_STATE_MAXIMIZED_HORZ ||
-          first == display->atom__NET_WM_STATE_MAXIMIZED_VERT ||
-          second == display->atom__NET_WM_STATE_MAXIMIZED_VERT)
+      if (first == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_HORZ ||
+          second == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_HORZ ||
+          first == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_VERT ||
+          second == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_VERT)
         {
           gboolean max;
           MetaMaximizeFlags directions = 0;
@@ -2374,12 +2374,12 @@ meta_window_x11_client_message (MetaWindow *window,
                  (action == _NET_WM_STATE_TOGGLE &&
                   !window->maximized_horizontally));
 
-          if (first == display->atom__NET_WM_STATE_MAXIMIZED_HORZ ||
-              second == display->atom__NET_WM_STATE_MAXIMIZED_HORZ)
+          if (first == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_HORZ ||
+              second == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_HORZ)
             directions |= META_MAXIMIZE_HORIZONTAL;
 
-          if (first == display->atom__NET_WM_STATE_MAXIMIZED_VERT ||
-              second == display->atom__NET_WM_STATE_MAXIMIZED_VERT)
+          if (first == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_VERT ||
+              second == display->x11_display->atom__NET_WM_STATE_MAXIMIZED_VERT)
             directions |= META_MAXIMIZE_VERTICAL;
 
           if (max && window->has_maximize_func)
@@ -2396,8 +2396,8 @@ meta_window_x11_client_message (MetaWindow *window,
             }
         }
 
-      if (first == display->atom__NET_WM_STATE_MODAL ||
-          second == display->atom__NET_WM_STATE_MODAL)
+      if (first == display->x11_display->atom__NET_WM_STATE_MODAL ||
+          second == display->x11_display->atom__NET_WM_STATE_MODAL)
         {
           priv->wm_state_modal =
             (action == _NET_WM_STATE_ADD) ||
@@ -2407,8 +2407,8 @@ meta_window_x11_client_message (MetaWindow *window,
           meta_window_queue(window, META_QUEUE_MOVE_RESIZE);
         }
 
-      if (first == display->atom__NET_WM_STATE_SKIP_PAGER ||
-          second == display->atom__NET_WM_STATE_SKIP_PAGER)
+      if (first == display->x11_display->atom__NET_WM_STATE_SKIP_PAGER ||
+          second == display->x11_display->atom__NET_WM_STATE_SKIP_PAGER)
         {
           priv->wm_state_skip_pager =
             (action == _NET_WM_STATE_ADD) ||
@@ -2418,8 +2418,8 @@ meta_window_x11_client_message (MetaWindow *window,
           meta_window_x11_set_net_wm_state (window);
         }
 
-      if (first == display->atom__NET_WM_STATE_SKIP_TASKBAR ||
-          second == display->atom__NET_WM_STATE_SKIP_TASKBAR)
+      if (first == display->x11_display->atom__NET_WM_STATE_SKIP_TASKBAR ||
+          second == display->x11_display->atom__NET_WM_STATE_SKIP_TASKBAR)
         {
           priv->wm_state_skip_taskbar =
             (action == _NET_WM_STATE_ADD) ||
@@ -2429,8 +2429,8 @@ meta_window_x11_client_message (MetaWindow *window,
           meta_window_x11_set_net_wm_state (window);
         }
 
-      if (first == display->atom__NET_WM_STATE_ABOVE ||
-          second == display->atom__NET_WM_STATE_ABOVE)
+      if (first == display->x11_display->atom__NET_WM_STATE_ABOVE ||
+          second == display->x11_display->atom__NET_WM_STATE_ABOVE)
         {
           if ((action == _NET_WM_STATE_ADD) ||
               (action == _NET_WM_STATE_TOGGLE && !window->wm_state_demands_attention))
@@ -2439,8 +2439,8 @@ meta_window_x11_client_message (MetaWindow *window,
             meta_window_unmake_above (window);
         }
 
-      if (first == display->atom__NET_WM_STATE_BELOW ||
-          second == display->atom__NET_WM_STATE_BELOW)
+      if (first == display->x11_display->atom__NET_WM_STATE_BELOW ||
+          second == display->x11_display->atom__NET_WM_STATE_BELOW)
         {
           window->wm_state_below =
             (action == _NET_WM_STATE_ADD) ||
@@ -2450,8 +2450,8 @@ meta_window_x11_client_message (MetaWindow *window,
           meta_window_x11_set_net_wm_state (window);
         }
 
-      if (first == display->atom__NET_WM_STATE_DEMANDS_ATTENTION ||
-          second == display->atom__NET_WM_STATE_DEMANDS_ATTENTION)
+      if (first == display->x11_display->atom__NET_WM_STATE_DEMANDS_ATTENTION ||
+          second == display->x11_display->atom__NET_WM_STATE_DEMANDS_ATTENTION)
         {
           if ((action == _NET_WM_STATE_ADD) ||
               (action == _NET_WM_STATE_TOGGLE && !window->wm_state_demands_attention))
@@ -2460,8 +2460,8 @@ meta_window_x11_client_message (MetaWindow *window,
             meta_window_unset_demands_attention (window);
         }
 
-       if (first == display->atom__NET_WM_STATE_STICKY ||
-          second == display->atom__NET_WM_STATE_STICKY)
+       if (first == display->x11_display->atom__NET_WM_STATE_STICKY ||
+          second == display->x11_display->atom__NET_WM_STATE_STICKY)
         {
           if ((action == _NET_WM_STATE_ADD) ||
               (action == _NET_WM_STATE_TOGGLE && !window->on_all_workspaces_requested))
@@ -2473,7 +2473,7 @@ meta_window_x11_client_message (MetaWindow *window,
       return TRUE;
     }
   else if (event->xclient.message_type ==
-           display->atom_WM_CHANGE_STATE)
+           display->x11_display->atom_WM_CHANGE_STATE)
     {
       meta_verbose ("WM_CHANGE_STATE client message, state: %ld\n",
                     event->xclient.data.l[0]);
@@ -2483,7 +2483,7 @@ meta_window_x11_client_message (MetaWindow *window,
       return TRUE;
     }
   else if (event->xclient.message_type ==
-           display->atom__NET_WM_MOVERESIZE)
+           display->x11_display->atom__NET_WM_MOVERESIZE)
     {
       int x_root;
       int y_root;
@@ -2628,7 +2628,7 @@ meta_window_x11_client_message (MetaWindow *window,
       return TRUE;
     }
   else if (event->xclient.message_type ==
-           display->atom__NET_MOVERESIZE_WINDOW)
+           display->x11_display->atom__NET_MOVERESIZE_WINDOW)
     {
       int gravity;
       guint value_mask;
@@ -2649,7 +2649,7 @@ meta_window_x11_client_message (MetaWindow *window,
                                       event->xclient.data.l[4]); /* height */
     }
   else if (event->xclient.message_type ==
-           display->atom__NET_ACTIVE_WINDOW)
+           display->x11_display->atom__NET_ACTIVE_WINDOW)
     {
       MetaClientType source_indication;
       guint32        timestamp;
@@ -2676,7 +2676,7 @@ meta_window_x11_client_message (MetaWindow *window,
       return TRUE;
     }
   else if (event->xclient.message_type ==
-           display->atom__NET_WM_FULLSCREEN_MONITORS)
+           display->x11_display->atom__NET_WM_FULLSCREEN_MONITORS)
     {
       MetaLogicalMonitor *top, *bottom, *left, *right;
 
@@ -2700,7 +2700,7 @@ meta_window_x11_client_message (MetaWindow *window,
       meta_window_update_fullscreen_monitors (window, top, bottom, left, right);
     }
   else if (event->xclient.message_type ==
-           display->atom__GTK_SHOW_WINDOW_MENU)
+           display->x11_display->atom__GTK_SHOW_WINDOW_MENU)
     {
       gulong x, y;
 
@@ -2920,7 +2920,7 @@ meta_window_x11_new (MetaDisplay       *display,
    * so we must be careful with X error handling.
    */
 
-  if (!XGetWindowAttributes (display->xdisplay, xwindow, &attrs))
+  if (!XGetWindowAttributes (display->x11_display->xdisplay, xwindow, &attrs))
     {
       meta_verbose ("Failed to get attributes for window 0x%lx\n",
                     xwindow);
@@ -2974,7 +2974,7 @@ meta_window_x11_new (MetaDisplay       *display,
    * want this call failing to prevent the window from being managed, we
    * call this before creating the return-checked error trap.
    */
-  XAddToSaveSet (display->xdisplay, xwindow);
+  XAddToSaveSet (display->x11_display->xdisplay, xwindow);
 
   meta_error_trap_push ();
 
@@ -2986,7 +2986,7 @@ meta_window_x11_new (MetaDisplay       *display,
    * the event mask, not replace it. For windows from other clients,
    * attrs.your_event_mask will be empty at this point.
    */
-  XSelectInput (display->xdisplay, xwindow, attrs.your_event_mask | event_mask);
+  XSelectInput (display->x11_display->xdisplay, xwindow, attrs.your_event_mask | event_mask);
 
   {
     unsigned char mask_bits[XIMaskLen (XI_LASTEVENT)] = { 0 };
@@ -2997,15 +2997,15 @@ meta_window_x11_new (MetaDisplay       *display,
     XISetMask (mask.mask, XI_FocusIn);
     XISetMask (mask.mask, XI_FocusOut);
 
-    XISelectEvents (display->xdisplay, xwindow, &mask, 1);
+    XISelectEvents (display->x11_display->xdisplay, xwindow, &mask, 1);
   }
 
-  if (META_DISPLAY_HAS_SHAPE (display))
-    XShapeSelectInput (display->xdisplay, xwindow, ShapeNotifyMask);
+  if (META_X11_DISPLAY_HAS_SHAPE (display->x11_display))
+    XShapeSelectInput (display->x11_display->xdisplay, xwindow, ShapeNotifyMask);
 
   /* Get rid of any borders */
   if (attrs.border_width != 0)
-    XSetWindowBorderWidth (display->xdisplay, xwindow, 0);
+    XSetWindowBorderWidth (display->x11_display->xdisplay, xwindow, 0);
 
   /* Get rid of weird gravities */
   if (attrs.win_gravity != NorthWestGravity)
@@ -3014,7 +3014,7 @@ meta_window_x11_new (MetaDisplay       *display,
 
       set_attrs.win_gravity = NorthWestGravity;
 
-      XChangeWindowAttributes (display->xdisplay,
+      XChangeWindowAttributes (display->x11_display->xdisplay,
                                xwindow,
                                CWWinGravity,
                                &set_attrs);
@@ -3065,36 +3065,36 @@ meta_window_x11_recalc_window_type (MetaWindow *window)
 
   if (priv->type_atom != None)
     {
-      if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_DESKTOP)
+      if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_DESKTOP))
         type = META_WINDOW_DESKTOP;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_DOCK)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_DOCK))
         type = META_WINDOW_DOCK;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_TOOLBAR)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_TOOLBAR))
         type = META_WINDOW_TOOLBAR;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_MENU)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_MENU))
         type = META_WINDOW_MENU;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_UTILITY)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_UTILITY))
         type = META_WINDOW_UTILITY;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_SPLASH)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_SPLASH))
         type = META_WINDOW_SPLASHSCREEN;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_DIALOG)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_DIALOG))
         type = META_WINDOW_DIALOG;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_NORMAL)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_NORMAL))
         type = META_WINDOW_NORMAL;
       /* The below are *typically* override-redirect windows, but the spec does
        * not disallow using them for managed windows.
        */
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_DROPDOWN_MENU)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_DROPDOWN_MENU))
         type = META_WINDOW_DROPDOWN_MENU;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_POPUP_MENU)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_POPUP_MENU))
         type = META_WINDOW_POPUP_MENU;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_TOOLTIP)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_TOOLTIP))
         type = META_WINDOW_TOOLTIP;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_NOTIFICATION)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_NOTIFICATION))
         type = META_WINDOW_NOTIFICATION;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_COMBO)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_COMBO))
         type = META_WINDOW_COMBO;
-      else if (priv->type_atom  == window->display->atom__NET_WM_WINDOW_TYPE_DND)
+      else if (priv->type_atom  == XATOM(window, atom__NET_WM_WINDOW_TYPE_DND))
         type = META_WINDOW_DND;
       else
         {

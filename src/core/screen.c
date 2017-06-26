@@ -562,7 +562,7 @@ take_manager_selection (MetaDisplay *display,
                         int          timestamp,
                         gboolean     should_replace)
 {
-  Display *xdisplay = display->xdisplay;
+  Display *xdisplay = display->x11_display->xdisplay;
   Window current_owner, new_owner;
 
   current_owner = XGetSelectionOwner (xdisplay, manager_atom);
@@ -582,7 +582,7 @@ take_manager_selection (MetaDisplay *display,
       else
         {
           meta_warning (_("Display “%s” already has a window manager; try using the --replace option to replace the current window manager."),
-                        display->name);
+                        display->x11_display->name);
           return None;
         }
     }
@@ -606,7 +606,7 @@ take_manager_selection (MetaDisplay *display,
 
     ev.type = ClientMessage;
     ev.window = xroot;
-    ev.message_type = display->atom_MANAGER;
+    ev.message_type = display->x11_display->atom_MANAGER;
     ev.format = 32;
     ev.data.l[0] = timestamp;
     ev.data.l[1] = manager_atom;
@@ -654,10 +654,10 @@ meta_screen_new (MetaDisplay *display,
    * created from the MetaDisplay constructor
    */
 
-  xdisplay = display->xdisplay;
+  xdisplay = display->x11_display->xdisplay;
 
   meta_verbose ("Trying screen %d on display '%s'\n",
-                number, display->name);
+                number, display->x11_display->name);
 
   xroot = RootWindow (xdisplay, number);
 
@@ -667,7 +667,7 @@ meta_screen_new (MetaDisplay *display,
   if (xroot == None)
     {
       meta_warning (_("Screen %d on display “%s” is invalid\n"),
-                    number, display->name);
+                    number, display->x11_display->name);
       return NULL;
     }
 
@@ -688,7 +688,7 @@ meta_screen_new (MetaDisplay *display,
     XISetMask (mask.mask, XI_FocusIn);
     XISetMask (mask.mask, XI_FocusOut);
 #ifdef HAVE_XI23
-    if (META_DISPLAY_HAS_XINPUT_23 (display))
+    if (META_X11_DISPLAY_HAS_XINPUT_23 (display->x11_display))
       {
         XISetMask (mask.mask, XI_BarrierHit);
         XISetMask (mask.mask, XI_BarrierLeave);
@@ -753,10 +753,10 @@ meta_screen_new (MetaDisplay *display,
 
   /* Handle creating a no_focus_window for this screen */
   screen->no_focus_window =
-    meta_create_offscreen_window (display->xdisplay,
+    meta_create_offscreen_window (display->x11_display->xdisplay,
                                   screen->xroot,
                                   FocusChangeMask|KeyPressMask|KeyReleaseMask);
-  XMapWindow (display->xdisplay, screen->no_focus_window);
+  XMapWindow (display->x11_display->xdisplay, screen->no_focus_window);
   /* Done with no_focus_window stuff */
 
   set_wm_icon_size_hint (screen);
@@ -856,7 +856,8 @@ meta_screen_free (MetaScreen *screen,
   XSelectInput (XDISPLAY(screen), screen->xroot, 0);
   if (meta_error_trap_pop_with_return () != Success)
     meta_warning ("Could not release screen %d on display \"%s\"\n",
-                  meta_ui_get_screen_number (), screen->display->name);
+                  meta_ui_get_screen_number (),
+                  screen->display->x11_display->name);
 
   unset_wm_check_hint (screen);
 
@@ -942,7 +943,7 @@ get_screen_name (MetaDisplay *display,
   /* DisplayString gives us a sort of canonical display,
    * vs. the user-entered name from XDisplayName()
    */
-  dname = g_strdup (DisplayString (display->xdisplay));
+  dname = g_strdup (DisplayString (display->x11_display->xdisplay));
 
   /* Change display name to specify this screen.
    */
@@ -1385,9 +1386,9 @@ meta_screen_update_cursor (MetaScreen *screen)
   /* Set a cursor for X11 applications that don't specify their own */
   xcursor = meta_display_create_x_cursor (display, cursor);
 
-  XDefineCursor (display->xdisplay, screen->xroot, xcursor);
-  XFlush (display->xdisplay);
-  XFreeCursor (display->xdisplay, xcursor);
+  XDefineCursor (display->x11_display->xdisplay, screen->xroot, xcursor);
+  XFlush (display->x11_display->xdisplay);
+  XFreeCursor (display->x11_display->xdisplay, xcursor);
 }
 
 void
