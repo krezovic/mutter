@@ -83,6 +83,7 @@ from The Open Group.
 #include <string.h>
 #include <stdlib.h>
 
+#include "display-x11-private.h"
 #include "xprops.h"
 #include <meta/errors.h>
 #include "util-private.h"
@@ -130,7 +131,8 @@ validate_or_free_results (GetPropertyResults *results,
   prop_name = XGetAtomName (results->display->xdisplay, results->xatom);
   meta_error_trap_pop ();
 
-  w = meta_display_lookup_x_window (results->display, results->xwindow);
+  w = meta_x11_display_lookup_x_window (results->display->x11_display,
+                                        results->xwindow);
 
   if (w != NULL)
     {

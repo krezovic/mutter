@@ -7133,8 +7133,8 @@ meta_window_get_transient_for (MetaWindow *window)
   if (window->transient_for)
     return window->transient_for;
   else if (window->xtransient_for)
-    return meta_display_lookup_x_window (window->display,
-                                         window->xtransient_for);
+    return meta_x11_display_lookup_x_window (window->display->x11_display,
+                                             window->xtransient_for);
   else
     return NULL;
 }
@@ -7673,7 +7673,7 @@ window_has_pointer_wayland (MetaWindow *window)
 static gboolean
 window_has_pointer_x11 (MetaWindow *window)
 {
-  MetaDisplay *display = window->display;
+  MetaX11Display *display = window->display->x11_display;
   MetaScreen *screen = window->screen;
   Window root, child;
   double root_x, root_y, x, y;
@@ -7691,7 +7691,7 @@ window_has_pointer_x11 (MetaWindow *window)
   meta_error_trap_pop ();
   free (buttons.mask);
 
-  return meta_display_lookup_x_window (display, child) == window;
+  return meta_x11_display_lookup_x_window (display, child) == window;
 }
 
 gboolean

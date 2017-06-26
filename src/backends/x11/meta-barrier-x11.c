@@ -84,7 +84,7 @@ _meta_barrier_impl_x11_destroy (MetaBarrierImpl *impl)
   MetaBarrierImplX11 *self = META_BARRIER_IMPL_X11 (impl);
   MetaBarrierImplX11Private *priv =
     meta_barrier_impl_x11_get_instance_private (self);
-  MetaDisplay *display = priv->barrier->priv->display;
+  MetaX11Display *display = priv->barrier->priv->display->x11_display;
   Display *dpy;
 
   if (display == NULL)
@@ -105,7 +105,7 @@ meta_barrier_impl_x11_new (MetaBarrier *barrier)
 {
   MetaBarrierImplX11 *self;
   MetaBarrierImplX11Private *priv;
-  MetaDisplay *display = barrier->priv->display;
+  MetaX11Display *display = barrier->priv->display->x11_display;
   Display *dpy;
   Window root;
   unsigned int allowed_motion_dirs;
@@ -173,8 +173,8 @@ meta_barrier_fire_xevent (MetaBarrier    *barrier,
 }
 
 gboolean
-meta_display_process_barrier_xevent (MetaDisplay *display,
-                                     XIEvent     *event)
+meta_x11_display_process_barrier_xevent (MetaX11Display *display,
+                                         XIEvent        *event)
 {
   MetaBarrier *barrier;
   XIBarrierEvent *xev;

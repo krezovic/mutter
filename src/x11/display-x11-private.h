@@ -39,6 +39,12 @@
 
 #include <x11/display-x11.h>
 
+#include <X11/extensions/sync.h>
+
+typedef gboolean (*MetaAlarmFilter) (MetaX11Display        *display,
+                                     XSyncAlarmNotifyEvent *event,
+                                     gpointer               data);
+
 struct _MetaX11Display
 {
   GObject parent_instance;
@@ -55,8 +61,13 @@ struct _MetaX11Display
 #include <x11/atomnames.h>
 #undef item
 
+  GHashTable *xids;
+
   int         xkb_base_event_type;
   guint32     last_bell_time;
+
+  MetaAlarmFilter alarm_filter;
+  gpointer alarm_filter_data;
 
   int composite_event_base;
   int composite_error_base;
@@ -100,5 +111,33 @@ void     meta_x11_display_close (MetaX11Display *display,
                                  guint32         timestamp);
 
 MetaX11Display *meta_get_x11_display (void);
+
+/* A given MetaWindow may have various X windows that "belong"
+ * to it, such as the frame window.
+ */
+MetaWindow* meta_x11_display_lookup_x_window     (MetaX11Display *display,
+                                                  Window          xwindow);
+void        meta_x11_display_register_x_window   (MetaX11Display *display,
+                                                  Window         *xwindowp,
+                                                  MetaWindow     *window);
+void        meta_x11_display_unregister_x_window (MetaX11Display *display,
+                                                  Window          xwindow);
+
+MetaWindow* meta_x11_display_lookup_sync_alarm     (MetaX11Display *display,
+                                                    XSyncAlarm      alarm);
+void        meta_x11_display_register_sync_alarm   (MetaX11Display *display,
+                                                    XSyncAlarm     *alarmp,
+                                                    MetaWindow     *window);
+void        meta_x11_display_unregister_sync_alarm (MetaX11Display *display,
+                                                    XSyncAlarm      alarm);
+
+void        meta_x11_display_set_alarm_filter (MetaX11Display *display,
+                                               MetaAlarmFilter filter,
+                                               gpointer        data);
+
+#ifdef HAVE_XI23
+gboolean meta_x11_display_process_barrier_xevent (MetaX11Display *display,
+                                                  XIEvent        *event);
+#endif /* HAVE_XI23 */
 
 #endif

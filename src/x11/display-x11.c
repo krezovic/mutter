@@ -153,6 +153,9 @@ meta_x11_display_open (MetaDisplay *display)
 
   meta_prefs_add_listener (prefs_changed_callback, x11_display);
 
+  x11_display->xids = g_hash_table_new (meta_unsigned_long_hash,
+                                        meta_unsigned_long_equal);
+
   x11_display->last_bell_time = 0;
 
   {
@@ -333,6 +336,11 @@ meta_x11_display_close (MetaX11Display  *display,
 
   meta_bell_shutdown (display);
 
+  /* Must be after all calls to meta_window_unmanage() since they
+   * unregister windows
+   */
+  g_hash_table_destroy (display->xids);
+
   XFlush (display->xdisplay);
 
   g_free (display->name);
@@ -373,6 +381,74 @@ int
 meta_x11_display_get_shape_event_base (MetaX11Display *display)
 {
   return display->shape_event_base;
+}
+
+void
+meta_x11_display_set_alarm_filter (MetaX11Display *display,
+                                   MetaAlarmFilter filter,
+                                   gpointer        data)
+{
+  g_return_if_fail (filter == NULL || display->alarm_filter == NULL);
+
+  display->alarm_filter = filter;
+  display->alarm_filter_data = data;
+}
+
+MetaWindow*
+meta_x11_display_lookup_x_window (MetaX11Display *display,
+                                  Window          xwindow)
+{
+  return g_hash_table_lookup (display->xids, &xwindow);
+}
+
+void
+meta_x11_display_register_x_window (MetaX11Display *display,
+                                    Window         *xwindowp,
+                                    MetaWindow     *window)
+{
+  g_return_if_fail (g_hash_table_lookup (display->xids, xwindowp) == NULL);
+
+  g_hash_table_insert (display->xids, xwindowp, window);
+}
+
+void
+meta_x11_display_unregister_x_window (MetaX11Display *display,
+                                      Window          xwindow)
+{
+  g_return_if_fail (g_hash_table_lookup (display->xids, &xwindow) != NULL);
+
+  g_hash_table_remove (display->xids, &xwindow);
+}
+
+/* We store sync alarms in the window ID hash table, because they are
+ * just more types of XIDs in the same global space, but we have
+ * typesafe functions to register/unregister for readability.
+ */
+
+MetaWindow*
+meta_x11_display_lookup_sync_alarm (MetaX11Display *display,
+                                    XSyncAlarm      alarm)
+{
+  return g_hash_table_lookup (display->xids, &alarm);
+}
+
+void
+meta_x11_display_register_sync_alarm (MetaX11Display *display,
+                                      XSyncAlarm     *alarmp,
+                                      MetaWindow     *window)
+{
+  g_return_if_fail (g_hash_table_lookup (display->xids, alarmp) == NULL);
+
+  g_hash_table_insert (display->xids, alarmp, window);
+}
+
+void
+meta_x11_display_unregister_sync_alarm (MetaX11Display *display,
+                                        XSyncAlarm      alarm)
+{
+  g_return_if_fail (g_hash_table_lookup (display->xids, &alarm) != NULL);
+
+  g_hash_table_remove (display->xids, &alarm);
 }
 
 static void

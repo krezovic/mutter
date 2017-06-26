@@ -509,13 +509,13 @@ meta_window_apply_session_info (MetaWindow *window,
 static void
 meta_window_x11_manage (MetaWindow *window)
 {
-  MetaDisplay *display = window->display;
+  MetaX11Display *display = window->display->x11_display;
   MetaWindowX11 *window_x11 = META_WINDOW_X11 (window);
   MetaWindowX11Private *priv = meta_window_x11_get_instance_private (window_x11);
 
   meta_icon_cache_init (&priv->icon_cache);
 
-  meta_display_register_x_window (display, &window->xwindow, window);
+  meta_x11_display_register_x_window (display, &window->xwindow, window);
 
   /* assign the window to its group, or create a new group if needed */
   window->group = NULL;
@@ -621,7 +621,8 @@ meta_window_x11_unmanage (MetaWindow *window)
                   window->xwindow);
     }
 
-  meta_display_unregister_x_window (window->display, window->xwindow);
+  meta_x11_display_unregister_x_window (window->display->x11_display,
+                                        window->xwindow);
 
   /* Put back anything we messed up */
   if (priv->border_width != 0)
@@ -649,8 +650,8 @@ meta_window_x11_unmanage (MetaWindow *window)
 
   if (window->user_time_window != None)
     {
-      meta_display_unregister_x_window (window->display,
-                                        window->user_time_window);
+      meta_x11_display_unregister_x_window (window->display->x11_display,
+                                            window->user_time_window);
       window->user_time_window = None;
     }
 
@@ -3339,7 +3340,9 @@ meta_window_x11_create_sync_request_alarm (MetaWindow *window)
                                                  &values);
 
   if (meta_error_trap_pop_with_return () == Success)
-    meta_display_register_sync_alarm (window->display, &window->sync_request_alarm, window);
+    meta_x11_display_register_sync_alarm (window->display->x11_display,
+                                          &window->sync_request_alarm,
+                                          window);
   else
     {
       window->sync_request_alarm = None;
@@ -3353,7 +3356,8 @@ meta_window_x11_destroy_sync_request_alarm (MetaWindow *window)
   if (window->sync_request_alarm != None)
     {
       /* Has to be unregistered _before_ clearing the structure field */
-      meta_display_unregister_sync_alarm (window->display, window->sync_request_alarm);
+      meta_x11_display_unregister_sync_alarm (window->display->x11_display,
+                                              window->sync_request_alarm);
       XSyncDestroyAlarm (XDISPLAY(window),
                          window->sync_request_alarm);
       window->sync_request_alarm = None;

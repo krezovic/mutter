@@ -855,7 +855,7 @@ handle_input_xevent (MetaDisplay  *display,
     }
 
   modified = xievent_get_modified_window (display, input_event);
-  window = modified != None ? meta_display_lookup_x_window (display, modified) : NULL;
+  window = modified != None ? meta_x11_display_lookup_x_window (display->x11_display, modified) : NULL;
 
   /* If this is an event for a GTK+ widget, let GTK+ handle it. */
   if (meta_ui_window_is_widget (display->screen->ui, modified))
@@ -1170,7 +1170,7 @@ notify_bell (MetaDisplay *display,
   XkbBellNotifyEvent *xkb_bell_event = (XkbBellNotifyEvent*) xkb_ev;
   MetaWindow *window;
 
-  window = meta_display_lookup_x_window (display, xkb_bell_event->window);
+  window = meta_x11_display_lookup_x_window (display->x11_display, xkb_bell_event->window);
   if (!window && display->focus_window && display->focus_window->frame)
     window = display->focus_window;
 
@@ -1198,7 +1198,7 @@ handle_other_xevent (MetaDisplay *display,
   gboolean bypass_gtk = FALSE;
 
   modified = event_get_modified_window (display, event);
-  window = modified != None ? meta_display_lookup_x_window (display, modified) : NULL;
+  window = modified != None ? meta_x11_display_lookup_x_window (display->x11_display, modified) : NULL;
   frame_was_receiver = (window && window->frame && modified == window->frame->xwindow);
 
   /* We only want to respond to _NET_WM_USER_TIME property notify
@@ -1215,8 +1215,8 @@ handle_other_xevent (MetaDisplay *display,
   if (META_DISPLAY_HAS_XSYNC (display) &&
       event->type == (display->xsync_event_base + XSyncAlarmNotify))
     {
-      MetaWindow *alarm_window = meta_display_lookup_sync_alarm (display,
-                                                                 ((XSyncAlarmNotifyEvent*)event)->alarm);
+      MetaWindow *alarm_window = meta_x11_display_lookup_sync_alarm (display->x11_display,
+                                                                     ((XSyncAlarmNotifyEvent*)event)->alarm);
 
       if (alarm_window != NULL)
         {
@@ -1228,10 +1228,10 @@ handle_other_xevent (MetaDisplay *display,
         }
       else
         {
-          if (display->alarm_filter &&
-              display->alarm_filter (display,
-                                     (XSyncAlarmNotifyEvent*)event,
-                                     display->alarm_filter_data))
+          if (display->x11_display->alarm_filter &&
+              display->x11_display->alarm_filter (display->x11_display,
+                                                  (XSyncAlarmNotifyEvent*)event,
+                                                  display->x11_display->alarm_filter_data))
             bypass_gtk = TRUE;
         }
 
@@ -1736,7 +1736,8 @@ meta_display_handle_xevent (MetaDisplay *display,
       meta_topic (META_DEBUG_FOCUS, "Earlier attempt to focus %s failed\n",
                   display->focus_window->desc);
       meta_display_update_focus_window (display,
-                                        meta_display_lookup_x_window (display, display->server_focus_window),
+                                        meta_x11_display_lookup_x_window (display->x11_display,
+                                                                          display->server_focus_window),
                                         display->server_focus_window,
                                         display->server_focus_serial,
                                         FALSE);
@@ -1768,7 +1769,7 @@ meta_display_handle_xevent (MetaDisplay *display,
     }
 
 #ifdef HAVE_XI23
-  if (meta_display_process_barrier_xevent (display, input_event))
+  if (meta_x11_display_process_barrier_xevent (display->x11_display, input_event))
     {
       bypass_gtk = bypass_compositor = TRUE;
       goto out;
@@ -1802,7 +1803,7 @@ meta_display_handle_xevent (MetaDisplay *display,
  out:
   if (!bypass_compositor)
     {
-      MetaWindow *window = modified != None ? meta_display_lookup_x_window (display, modified) : NULL;
+      MetaWindow *window = modified != None ? meta_x11_display_lookup_x_window (display->x11_display, modified) : NULL;
 
       if (meta_compositor_process_event (display->compositor, event, window))
         bypass_gtk = TRUE;
