@@ -281,9 +281,9 @@ set_wm_check_hint (MetaScreen *screen)
 {
   unsigned long data[1];
 
-  g_return_val_if_fail (screen->display->leader_window != None, 0);
+  g_return_val_if_fail (screen->display->x11_display->leader_window != None, 0);
 
-  data[0] = screen->display->leader_window;
+  data[0] = screen->display->x11_display->leader_window;
 
   XChangeProperty (XDISPLAY(screen), screen->xroot,
                    XATOM(screen, atom__NET_SUPPORTING_WM_CHECK),
@@ -806,7 +806,7 @@ meta_screen_init_workspaces (MetaScreen *screen)
   timestamp = screen->wm_sn_timestamp;
 
   /* Get current workspace */
-  if (meta_prop_get_cardinal (screen->display,
+  if (meta_prop_get_cardinal (screen->display->x11_display,
                               screen->xroot,
                               XATOM(screen, atom__NET_CURRENT_DESKTOP),
                               &current_workspace_index))
@@ -1199,7 +1199,8 @@ update_num_workspaces (MetaScreen *screen,
       n_items = 0;
       list = NULL;
 
-      if (meta_prop_get_cardinal_list (screen->display, screen->xroot,
+      if (meta_prop_get_cardinal_list (screen->display->x11_display,
+                                       screen->xroot,
                                        XATOM(screen, atom__NET_NUMBER_OF_DESKTOPS),
                                        &list, &n_items))
         {
@@ -1660,7 +1661,7 @@ meta_screen_update_workspace_layout (MetaScreen *screen)
   list = NULL;
   n_items = 0;
 
-  if (meta_prop_get_cardinal_list (screen->display,
+  if (meta_prop_get_cardinal_list (screen->display->x11_display,
                                    screen->xroot,
                                    XATOM(screen, atom__NET_DESKTOP_LAYOUT),
                                    &list, &n_items))
@@ -1834,7 +1835,7 @@ meta_screen_update_workspace_names (MetaScreen *screen)
 
   names = NULL;
   n_names = 0;
-  if (!meta_prop_get_utf8_list (screen->display,
+  if (!meta_prop_get_utf8_list (screen->display->x11_display,
                                 screen->xroot,
                                 XATOM(screen, atom__NET_DESKTOP_NAMES),
                                 &names, &n_names))

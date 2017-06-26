@@ -153,10 +153,6 @@ static guint display_signals [LAST_SIGNAL] = { 0 };
  */
 static MetaDisplay *the_display = NULL;
 
-
-static const char *gnome_wm_keybindings = "Mutter";
-static const char *net_wm_name = "Mutter";
-
 static int mru_cmp (gconstpointer a,
                     gconstpointer b);
 
@@ -481,36 +477,6 @@ meta_display_init (MetaDisplay *disp)
    * but it doesn't really matter. */
 }
 
-/**
- * meta_set_wm_name: (skip)
- * @wm_name: value for _NET_WM_NAME
- *
- * Set the value to use for the _NET_WM_NAME property. To take effect,
- * it is necessary to call this function before meta_init().
- */
-void
-meta_set_wm_name (const char *wm_name)
-{
-  g_return_if_fail (the_display == NULL);
-
-  net_wm_name = wm_name;
-}
-
-/**
- * meta_set_gnome_wm_keybindings: (skip)
- * @wm_keybindings: value for _GNOME_WM_KEYBINDINGS
- *
- * Set the value to use for the _GNOME_WM_KEYBINDINGS property. To take
- * effect, it is necessary to call this function before meta_init().
- */
-void
-meta_set_gnome_wm_keybindings (const char *wm_keybindings)
-{
-  g_return_if_fail (the_display == NULL);
-
-  gnome_wm_keybindings = wm_keybindings;
-}
-
 void
 meta_display_cancel_touch (MetaDisplay *display)
 {
@@ -610,25 +576,10 @@ meta_display_open (void)
 
   meta_display_init_keys (display);
 
-  meta_x11_display_open (display);
-  g_assert (display->x11_display != NULL);
-
-  /* XXX: Transitional */
-  xdisplay = display->x11_display->xdisplay;
-  display->name = display->x11_display->name;
-  display->xdisplay = xdisplay;
-
-  /* Offscreen unmapped window used for _NET_SUPPORTING_WM_CHECK,
-   * created in screen_new
-   */
-  display->leader_window = None;
-  display->timestamp_pinging_window = None;
-
   display->screen = NULL;
 
   /* Get events */
   meta_display_init_events (display);
-  meta_display_init_events_x11 (display);
 
   display->stamps = g_hash_table_new (g_int64_hash,
                                       g_int64_equal);
@@ -654,6 +605,16 @@ meta_display_open (void)
 
   display->grab_edge_resistance_data = NULL;
 
+  meta_x11_display_open (display);
+  g_assert (display->x11_display != NULL);
+
+  /* XXX: Transitional */
+  xdisplay = display->x11_display->xdisplay;
+  display->name = display->x11_display->name;
+  display->xdisplay = xdisplay;
+
+  timestamp = display->x11_display->timestamp;
+
   /* XXX: Transitional */
   {
     display->xsync_error_base = display->x11_display->xsync_error_base;
@@ -674,68 +635,7 @@ meta_display_open (void)
     display->have_xinput_23 = display->x11_display->have_xinput_23;
   }
 
-  /* Create the leader window here. Set its properties and
-   * use the timestamp from one of the PropertyNotify events
-   * that will follow.
-   */
-  {
-    gulong data[1];
-    XEvent event;
-
-    /* We only care about the PropertyChangeMask in the next 30 or so lines of
-     * code.  Note that gdk will at some point unset the PropertyChangeMask for
-     * this window, so we can't rely on it still being set later.  See bug
-     * 354213 for details.
-     */
-    display->leader_window =
-      meta_create_offscreen_window (display->xdisplay,
-                                    DefaultRootWindow (display->xdisplay),
-                                    PropertyChangeMask);
-
-    meta_prop_set_utf8_string_hint (display,
-                                    display->leader_window,
-                                    display->atom__NET_WM_NAME,
-                                    net_wm_name);
-
-    meta_prop_set_utf8_string_hint (display,
-                                    display->leader_window,
-                                    display->atom__GNOME_WM_KEYBINDINGS,
-                                    gnome_wm_keybindings);
-
-    meta_prop_set_utf8_string_hint (display,
-                                    display->leader_window,
-                                    display->atom__MUTTER_VERSION,
-                                    VERSION);
-
-    data[0] = display->leader_window;
-    XChangeProperty (display->xdisplay,
-                     display->leader_window,
-                     display->atom__NET_SUPPORTING_WM_CHECK,
-                     XA_WINDOW,
-                     32, PropModeReplace, (guchar*) data, 1);
-
-    XWindowEvent (display->xdisplay,
-                  display->leader_window,
-                  PropertyChangeMask,
-                  &event);
-
-    timestamp = event.xproperty.time;
-
-    /* Make it painfully clear that we can't rely on PropertyNotify events on
-     * this window, as per bug 354213.
-     */
-    XSelectInput(display->xdisplay,
-                 display->leader_window,
-                 NoEventMask);
-  }
-
-  /* Make a little window used only for pinging the server for timestamps; note
-   * that meta_create_offscreen_window already selects for PropertyChangeMask.
-   */
-  display->timestamp_pinging_window =
-    meta_create_offscreen_window (display->xdisplay,
-                                  DefaultRootWindow (display->xdisplay),
-                                  PropertyChangeMask);
+  meta_display_init_events_x11 (display);
 
   display->last_focus_time = timestamp;
   display->last_user_time = timestamp;
@@ -759,8 +659,9 @@ meta_display_open (void)
   display->screen = screen;
 
   if (!meta_is_wayland_compositor ())
-    meta_prop_get_window (display, display->screen->xroot,
-                          display->atom__NET_ACTIVE_WINDOW,
+    meta_prop_get_window (display->x11_display,
+                          display->screen->xroot,
+                          display->x11_display->atom__NET_ACTIVE_WINDOW,
                           &old_active_xwindow);
 
   display->startup_notification = meta_startup_notification_get (display);
@@ -944,9 +845,6 @@ meta_display_close (MetaDisplay *display,
    */
   g_hash_table_destroy (display->wayland_windows);
 
-  if (display->leader_window != None)
-    XDestroyWindow (display->xdisplay, display->leader_window);
-
   meta_display_shutdown_keys (display);
 
   if (display->compositor)
@@ -1104,41 +1002,11 @@ meta_display_get_current_time (MetaDisplay *display)
   return display->current_time;
 }
 
-static Bool
-find_timestamp_predicate (Display  *xdisplay,
-                          XEvent   *ev,
-                          XPointer  arg)
-{
-  MetaDisplay *display = (MetaDisplay *) arg;
-
-  return (ev->type == PropertyNotify &&
-          ev->xproperty.atom == display->atom__MUTTER_TIMESTAMP_PING);
-}
-
 /* Get a timestamp, even if it means a roundtrip */
 guint32
 meta_display_get_current_time_roundtrip (MetaDisplay *display)
 {
-  guint32 timestamp;
-
-  timestamp = meta_display_get_current_time (display);
-  if (timestamp == CurrentTime)
-    {
-      XEvent property_event;
-
-      XChangeProperty (display->xdisplay, display->timestamp_pinging_window,
-                       display->atom__MUTTER_TIMESTAMP_PING,
-                       XA_STRING, 8, PropModeAppend, NULL, 0);
-      XIfEvent (display->xdisplay,
-                &property_event,
-                find_timestamp_predicate,
-                (XPointer) display);
-      timestamp = property_event.xproperty.time;
-    }
-
-  meta_display_sanity_check_timestamps (display, timestamp);
-
-  return timestamp;
+  return meta_x11_display_get_current_time_roundtrip (display->x11_display);
 }
 
 /**
@@ -1355,7 +1223,7 @@ request_xserver_input_focus_change (MetaDisplay *display,
                   RevertToPointerRoot,
                   timestamp);
 
-  XChangeProperty (display->xdisplay, display->timestamp_pinging_window,
+  XChangeProperty (display->xdisplay, display->x11_display->timestamp_pinging_window,
                    display->atom__MUTTER_FOCUS_SET,
                    XA_STRING, 8, PropModeAppend, NULL, 0);
 
@@ -1811,14 +1679,6 @@ meta_display_check_threshold_reached (MetaDisplay *display,
   if (ABS (display->grab_initial_x - x) >= 8 ||
       ABS (display->grab_initial_y - y) >= 8)
     display->grab_threshold_movement_reached = TRUE;
-}
-
-void
-meta_display_increment_event_serial (MetaDisplay *display)
-{
-  /* We just make some random X request */
-  XDeleteProperty (display->xdisplay, display->leader_window,
-                   display->atom__MOTIF_WM_HINTS);
 }
 
 void

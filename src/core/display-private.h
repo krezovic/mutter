@@ -110,9 +110,6 @@ struct _MetaDisplay
 
   int clutter_event_filter;
 
-  Window leader_window;
-  Window timestamp_pinging_window;
-
   /* Pull in all the names of atoms as fields; we will intern them when the
    * class is constructed.
    */
@@ -359,9 +356,6 @@ void meta_display_ungrab_focus_window_button (MetaDisplay *display,
 
 /* Next function is defined in edge-resistance.c */
 void meta_display_cleanup_edges              (MetaDisplay *display);
-
-/* make a request to ensure the event serial has changed */
-void     meta_display_increment_event_serial (MetaDisplay *display);
 
 void     meta_display_update_active_window_hint (MetaDisplay *display);
 

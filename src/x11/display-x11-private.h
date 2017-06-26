@@ -57,6 +57,12 @@ struct _MetaX11Display
   char *name;
   Display *xdisplay;
 
+  Window leader_window;
+  Window timestamp_pinging_window;
+
+  /* XXX: Transitional */
+  guint32 timestamp;
+
   /* Pull in all the names of atoms as fields; we will intern them when the
    * class is constructed.
    */
@@ -153,5 +159,10 @@ void        meta_x11_display_set_alarm_filter (MetaX11Display *display,
 gboolean meta_x11_display_process_barrier_xevent (MetaX11Display *display,
                                                   XIEvent        *event);
 #endif /* HAVE_XI23 */
+
+guint32 meta_x11_display_get_current_time_roundtrip (MetaX11Display *display);
+
+/* make a request to ensure the event serial has changed */
+void meta_x11_display_increment_event_serial (MetaX11Display *display);
 
 #endif

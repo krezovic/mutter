@@ -96,14 +96,14 @@ from The Open Group.
 
 typedef struct
 {
-  MetaDisplay   *display;
-  Window         xwindow;
-  Atom           xatom;
-  Atom           type;
-  int            format;
-  unsigned long  n_items;
-  unsigned long  bytes_after;
-  unsigned char *prop;
+  MetaX11Display *display;
+  Window          xwindow;
+  Atom            xatom;
+  Atom            type;
+  int             format;
+  unsigned long   n_items;
+  unsigned long   bytes_after;
+  unsigned char  *prop;
 } GetPropertyResults;
 
 static gboolean
@@ -131,7 +131,7 @@ validate_or_free_results (GetPropertyResults *results,
   prop_name = XGetAtomName (results->display->xdisplay, results->xatom);
   meta_error_trap_pop ();
 
-  w = meta_x11_display_lookup_x_window (results->display->x11_display,
+  w = meta_x11_display_lookup_x_window (results->display,
                                         results->xwindow);
 
   if (w != NULL)
@@ -227,7 +227,7 @@ async_get_property_finish (xcb_connection_t          *xcb_conn,
 }
 
 static gboolean
-get_property (MetaDisplay        *display,
+get_property (MetaX11Display     *display,
               Window              xwindow,
               Atom                xatom,
               Atom                req_type,
@@ -280,11 +280,11 @@ cardinal_list_from_results (GetPropertyResults *results,
 }
 
 gboolean
-meta_prop_get_cardinal_list (MetaDisplay *display,
-                             Window       xwindow,
-                             Atom         xatom,
-                             uint32_t   **cardinals_p,
-                             int         *n_cardinals_p)
+meta_prop_get_cardinal_list (MetaX11Display *display,
+                             Window          xwindow,
+                             Atom            xatom,
+                             uint32_t      **cardinals_p,
+                             int            *n_cardinals_p)
 {
   GetPropertyResults results;
 
@@ -334,10 +334,10 @@ motif_hints_from_results (GetPropertyResults *results,
 }
 
 gboolean
-meta_prop_get_motif_hints (MetaDisplay   *display,
-                           Window         xwindow,
-                           Atom           xatom,
-                           MotifWmHints **hints_p)
+meta_prop_get_motif_hints (MetaX11Display *display,
+                           Window          xwindow,
+                           Atom            xatom,
+                           MotifWmHints  **hints_p)
 {
   GetPropertyResults results;
 
@@ -368,10 +368,10 @@ latin1_string_from_results (GetPropertyResults *results,
 }
 
 gboolean
-meta_prop_get_latin1_string (MetaDisplay *display,
-                             Window       xwindow,
-                             Atom         xatom,
-                             char       **str_p)
+meta_prop_get_latin1_string (MetaX11Display *display,
+                             Window          xwindow,
+                             Atom            xatom,
+                             char          **str_p)
 {
   GetPropertyResults results;
 
@@ -494,11 +494,11 @@ utf8_list_from_results (GetPropertyResults *results,
 
 /* returns g_malloc not Xmalloc memory */
 gboolean
-meta_prop_get_utf8_list (MetaDisplay   *display,
-                         Window         xwindow,
-                         Atom           xatom,
-                         char        ***str_p,
-                         int           *n_str_p)
+meta_prop_get_utf8_list (MetaX11Display *display,
+                         Window          xwindow,
+                         Atom            xatom,
+                         char         ***str_p,
+                         int            *n_str_p)
 {
   GetPropertyResults results;
 
@@ -513,7 +513,7 @@ meta_prop_get_utf8_list (MetaDisplay   *display,
 }
 
 void
-meta_prop_set_utf8_string_hint (MetaDisplay *display,
+meta_prop_set_utf8_string_hint (MetaX11Display *display,
                                 Window xwindow,
                                 Atom atom,
                                 const char *val)
@@ -574,10 +574,10 @@ counter_list_from_results (GetPropertyResults *results,
 }
 
 gboolean
-meta_prop_get_window (MetaDisplay *display,
-                      Window       xwindow,
-                      Atom         xatom,
-                      Window      *window_p)
+meta_prop_get_window (MetaX11Display *display,
+                      Window          xwindow,
+                      Atom            xatom,
+                      Window         *window_p)
 {
   GetPropertyResults results;
 
@@ -591,10 +591,10 @@ meta_prop_get_window (MetaDisplay *display,
 }
 
 gboolean
-meta_prop_get_cardinal (MetaDisplay   *display,
-                        Window         xwindow,
-                        Atom           xatom,
-                        uint32_t      *cardinal_p)
+meta_prop_get_cardinal (MetaX11Display *display,
+                        Window          xwindow,
+                        Atom            xatom,
+                        uint32_t       *cardinal_p)
 {
   return meta_prop_get_cardinal_with_atom_type (display, xwindow, xatom,
                                                 XA_CARDINAL, cardinal_p);
@@ -616,11 +616,11 @@ cardinal_with_atom_type_from_results (GetPropertyResults *results,
 }
 
 gboolean
-meta_prop_get_cardinal_with_atom_type (MetaDisplay   *display,
-                                       Window         xwindow,
-                                       Atom           xatom,
-                                       Atom           prop_type,
-                                       uint32_t      *cardinal_p)
+meta_prop_get_cardinal_with_atom_type (MetaX11Display *display,
+                                       Window          xwindow,
+                                       Atom            xatom,
+                                       Atom            prop_type,
+                                       uint32_t       *cardinal_p)
 {
   GetPropertyResults results;
 
@@ -854,10 +854,10 @@ latin1_to_utf8 (const char *text)
 }
 
 void
-meta_prop_get_values (MetaDisplay   *display,
-                      Window         xwindow,
-                      MetaPropValue *values,
-                      int            n_values)
+meta_prop_get_values (MetaX11Display *display,
+                      Window          xwindow,
+                      MetaPropValue  *values,
+                      int             n_values)
 {
   int i;
   xcb_get_property_cookie_t *tasks;

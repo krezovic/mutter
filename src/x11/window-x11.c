@@ -107,8 +107,8 @@ send_icccm_message (MetaWindow *window,
 }
 
 static Window
-read_client_leader (MetaDisplay *display,
-                    Window       xwindow)
+read_client_leader (MetaX11Display *display,
+                    Window          xwindow)
 {
   Window retval = None;
 
@@ -132,7 +132,7 @@ find_client_leader_func (MetaWindow *ancestor,
 
   d = data;
 
-  d->leader = read_client_leader (ancestor->display,
+  d->leader = read_client_leader (ancestor->display->x11_display,
                                   ancestor->xwindow);
 
   /* keep going if no client leader found */
@@ -151,7 +151,7 @@ update_sm_hints (MetaWindow *window)
    * leader from transient parents. If we find a client
    * leader, we read the SM_CLIENT_ID from it.
    */
-  leader = read_client_leader (window->display, window->xwindow);
+  leader = read_client_leader (window->display->x11_display, window->xwindow);
   if (leader == None)
     {
       ClientLeaderData d;
@@ -167,7 +167,7 @@ update_sm_hints (MetaWindow *window)
 
       window->xclient_leader = leader;
 
-      if (meta_prop_get_latin1_string (window->display, leader,
+      if (meta_prop_get_latin1_string (window->display->x11_display, leader,
                                        XATOM(window, atom_SM_CLIENT_ID),
                                        &str))
         {
@@ -187,7 +187,8 @@ update_sm_hints (MetaWindow *window)
           char *str;
 
           str = NULL;
-          if (meta_prop_get_latin1_string (window->display, window->xwindow,
+          if (meta_prop_get_latin1_string (window->display->x11_display,
+                                           window->xwindow,
                                            XATOM(window, atom_SM_CLIENT_ID),
                                            &str))
             {
@@ -1283,7 +1284,7 @@ meta_window_x11_update_struts (MetaWindow *window)
   old_struts = window->struts;
   new_struts = NULL;
 
-  if (meta_prop_get_cardinal_list (window->display,
+  if (meta_prop_get_cardinal_list (window->display->x11_display,
                                    window->xwindow,
                                    XATOM(window, atom__NET_WM_STRUT_PARTIAL),
                                    &struts, &nitems))
@@ -1349,7 +1350,7 @@ meta_window_x11_update_struts (MetaWindow *window)
     }
 
   if (!new_struts &&
-      meta_prop_get_cardinal_list (window->display,
+      meta_prop_get_cardinal_list (window->display->x11_display,
                                    window->xwindow,
                                    XATOM(window, atom__NET_WM_STRUT),
                                    &struts, &nitems))
@@ -2714,9 +2715,9 @@ meta_window_x11_client_message (MetaWindow *window,
 }
 
 static void
-set_wm_state_on_xwindow (MetaDisplay *display,
-                         Window       xwindow,
-                         int          state)
+set_wm_state_on_xwindow (MetaX11Display *display,
+                         Window          xwindow,
+                         int             state)
 {
   unsigned long data[2];
 
@@ -2746,7 +2747,7 @@ meta_window_x11_set_wm_state (MetaWindow *window)
   else
     state = NormalState;
 
-  set_wm_state_on_xwindow (window->display, window->xwindow, state);
+  set_wm_state_on_xwindow (window->display->x11_display, window->xwindow, state);
 }
 
 /* The MUTTER_WM_CLASS_FILTER environment variable is designed for
@@ -2759,7 +2760,7 @@ meta_window_x11_set_wm_state (MetaWindow *window)
  * Returns TRUE if window has been filtered out and should be ignored.
  */
 static gboolean
-maybe_filter_xwindow (MetaDisplay       *display,
+maybe_filter_xwindow (MetaX11Display    *display,
                       Window             xwindow,
                       gboolean           must_be_viewable,
                       XWindowAttributes *attrs)
@@ -2938,7 +2939,7 @@ meta_window_x11_new (MetaDisplay       *display,
       goto error;
     }
 
-  if (maybe_filter_xwindow (display, xwindow, must_be_viewable, &attrs))
+  if (maybe_filter_xwindow (display->x11_display, xwindow, must_be_viewable, &attrs))
     {
       meta_verbose ("Not managing filtered window\n");
       goto error;
@@ -2951,9 +2952,9 @@ meta_window_x11_new (MetaDisplay       *display,
       uint32_t state;
 
       /* WM_STATE isn't a cardinal, it's type WM_STATE, but is an int */
-      if (!(meta_prop_get_cardinal_with_atom_type (display, xwindow,
-                                                   display->atom_WM_STATE,
-                                                   display->atom_WM_STATE,
+      if (!(meta_prop_get_cardinal_with_atom_type (display->x11_display, xwindow,
+                                                   display->x11_display->atom_WM_STATE,
+                                                   display->x11_display->atom_WM_STATE,
                                                    &state) &&
             (state == IconicState || state == NormalState)))
         {

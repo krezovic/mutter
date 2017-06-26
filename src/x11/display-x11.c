@@ -39,6 +39,7 @@
 
 #include "backends/x11/meta-backend-x11.h"
 
+#include <meta/main.h>
 #include <meta/meta-backend.h>
 
 #ifdef HAVE_RANDR
@@ -57,6 +58,7 @@
 
 #include "x11/group-props.h"
 #include "x11/window-props.h"
+#include "x11/xprops.h"
 
 #ifdef HAVE_WAYLAND
 #include "wayland/meta-xwayland-private.h"
@@ -64,10 +66,43 @@
 
 G_DEFINE_TYPE(MetaX11Display, meta_x11_display, G_TYPE_OBJECT);
 
+static const char *gnome_wm_keybindings = "Mutter";
+static const char *net_wm_name = "Mutter";
+
 static void update_cursor_theme (void);
 
 static void prefs_changed_callback (MetaPreference pref,
 				    void          *data);
+
+/**
+ * meta_set_wm_name: (skip)
+ * @wm_name: value for _NET_WM_NAME
+ *
+ * Set the value to use for the _NET_WM_NAME property. To take effect,
+ * it is necessary to call this function before meta_init().
+ */
+void
+meta_set_wm_name (const char *wm_name)
+{
+  g_return_if_fail (meta_get_display () == NULL);
+
+  net_wm_name = wm_name;
+}
+
+/**
+ * meta_set_gnome_wm_keybindings: (skip)
+ * @wm_keybindings: value for _GNOME_WM_KEYBINDINGS
+ *
+ * Set the value to use for the _GNOME_WM_KEYBINDINGS property. To take
+ * effect, it is necessary to call this function before meta_init().
+ */
+void
+meta_set_gnome_wm_keybindings (const char *wm_keybindings)
+{
+  g_return_if_fail (meta_get_display () == NULL);
+
+  gnome_wm_keybindings = wm_keybindings;
+}
 
 static void
 meta_x11_display_class_init (MetaX11DisplayClass *klass)
@@ -160,6 +195,12 @@ meta_x11_display_open (MetaDisplay *display)
   meta_display_init_window_prop_hooks (x11_display);
   x11_display->group_prop_hooks = NULL;
   meta_display_init_group_prop_hooks (x11_display);
+
+  /* Offscreen unmapped window used for _NET_SUPPORTING_WM_CHECK,
+   * created in screen_new
+   */
+  x11_display->leader_window = None;
+  x11_display->timestamp_pinging_window = None;
 
   x11_display->groups_by_leader = NULL;
 
@@ -331,6 +372,70 @@ meta_x11_display_open (MetaDisplay *display)
 
   update_cursor_theme ();
 
+  /* Create the leader window here. Set its properties and
+   * use the timestamp from one of the PropertyNotify events
+   * that will follow.
+   */
+  {
+    gulong data[1];
+    XEvent event;
+
+    /* We only care about the PropertyChangeMask in the next 30 or so lines of
+     * code.  Note that gdk will at some point unset the PropertyChangeMask for
+     * this window, so we can't rely on it still being set later.  See bug
+     * 354213 for details.
+     */
+    x11_display->leader_window =
+      meta_create_offscreen_window (xdisplay,
+                                    DefaultRootWindow (xdisplay),
+                                    PropertyChangeMask);
+
+    meta_prop_set_utf8_string_hint (x11_display,
+                                    x11_display->leader_window,
+                                    x11_display->atom__NET_WM_NAME,
+                                    net_wm_name);
+
+    meta_prop_set_utf8_string_hint (x11_display,
+                                    x11_display->leader_window,
+                                    x11_display->atom__GNOME_WM_KEYBINDINGS,
+                                    gnome_wm_keybindings);
+
+    meta_prop_set_utf8_string_hint (x11_display,
+                                    x11_display->leader_window,
+                                    x11_display->atom__MUTTER_VERSION,
+                                    VERSION);
+
+    data[0] = x11_display->leader_window;
+    XChangeProperty (xdisplay,
+                     x11_display->leader_window,
+                     x11_display->atom__NET_SUPPORTING_WM_CHECK,
+                     XA_WINDOW,
+                     32, PropModeReplace, (guchar*) data, 1);
+
+    XWindowEvent (xdisplay,
+                  x11_display->leader_window,
+                  PropertyChangeMask,
+                  &event);
+
+    x11_display->timestamp = event.xproperty.time;
+
+    /* Make it painfully clear that we can't rely on PropertyNotify events on
+     * this window, as per bug 354213.
+     */
+    XSelectInput(xdisplay,
+                 x11_display->leader_window,
+                 NoEventMask);
+  }
+
+  /* Make a little window used only for pinging the server for timestamps; note
+   * that meta_create_offscreen_window already selects for PropertyChangeMask.
+   */
+  x11_display->timestamp_pinging_window =
+    meta_create_offscreen_window (xdisplay,
+                                  DefaultRootWindow (xdisplay),
+                                  PropertyChangeMask);
+
+
   return TRUE;
 }
 
@@ -350,6 +455,9 @@ meta_x11_display_close (MetaX11Display  *display,
    * unregister windows
    */
   g_hash_table_destroy (display->xids);
+
+  if (display->leader_window != None)
+    XDestroyWindow (display->xdisplay, display->leader_window);
 
   XFlush (display->xdisplay);
 
@@ -397,6 +505,15 @@ meta_x11_display_get_shape_event_base (MetaX11Display *display)
 }
 
 void
+meta_x11_display_increment_event_serial (MetaX11Display *display)
+{
+  /* We just make some random X request */
+  XDeleteProperty (display->xdisplay, display->leader_window,
+                   display->atom__MOTIF_WM_HINTS);
+}
+
+
+void
 meta_x11_display_set_alarm_filter (MetaX11Display *display,
                                    MetaAlarmFilter filter,
                                    gpointer        data)
@@ -405,6 +522,43 @@ meta_x11_display_set_alarm_filter (MetaX11Display *display,
 
   display->alarm_filter = filter;
   display->alarm_filter_data = data;
+}
+
+static Bool
+find_timestamp_predicate (Display  *xdisplay,
+                          XEvent   *ev,
+                          XPointer  arg)
+{
+  MetaX11Display *display = (MetaX11Display *) arg;
+
+  return (ev->type == PropertyNotify &&
+          ev->xproperty.atom == display->atom__MUTTER_TIMESTAMP_PING);
+}
+
+/* Get a timestamp, even if it means a roundtrip */
+guint32
+meta_x11_display_get_current_time_roundtrip (MetaX11Display *display)
+{
+  guint32 timestamp;
+
+  timestamp = meta_display_get_current_time (display->display);
+  if (timestamp == CurrentTime)
+    {
+      XEvent property_event;
+
+      XChangeProperty (display->xdisplay, display->timestamp_pinging_window,
+                       display->atom__MUTTER_TIMESTAMP_PING,
+                       XA_STRING, 8, PropModeAppend, NULL, 0);
+      XIfEvent (display->xdisplay,
+                &property_event,
+                find_timestamp_predicate,
+                (XPointer) display);
+      timestamp = property_event.xproperty.time;
+    }
+
+  meta_display_sanity_check_timestamps (display->display, timestamp);
+
+  return timestamp;
 }
 
 MetaWindow*

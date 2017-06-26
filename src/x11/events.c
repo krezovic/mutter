@@ -947,9 +947,9 @@ process_request_frame_extents (MetaDisplay    *display,
   meta_verbose ("Setting frame extents for 0x%lx\n", xwindow);
 
   /* See if the window is decorated. */
-  hints_set = meta_prop_get_motif_hints (display,
+  hints_set = meta_prop_get_motif_hints (display->x11_display,
                                          xwindow,
-                                         display->atom__MOTIF_WM_HINTS,
+                                         display->x11_display->atom__MOTIF_WM_HINTS,
                                          &hints);
   if ((hints_set && hints->decorations) || !hints_set)
     {
