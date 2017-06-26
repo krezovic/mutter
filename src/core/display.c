@@ -608,6 +608,8 @@ meta_display_open (void)
   display->allow_terminal_deactivation = TRUE; /* Only relevant for when a
                                                   terminal has the focus */
 
+  meta_display_init_keys (display);
+
   meta_x11_display_open (display);
   g_assert (display->x11_display != NULL);
 
@@ -616,20 +618,11 @@ meta_display_open (void)
   display->name = display->x11_display->name;
   display->xdisplay = xdisplay;
 
-  meta_display_init_keys (display);
-
-  display->prop_hooks = NULL;
-  meta_display_init_window_prop_hooks (display);
-  display->group_prop_hooks = NULL;
-  meta_display_init_group_prop_hooks (display);
-
   /* Offscreen unmapped window used for _NET_SUPPORTING_WM_CHECK,
    * created in screen_new
    */
   display->leader_window = None;
   display->timestamp_pinging_window = None;
-
-  display->groups_by_leader = NULL;
 
   display->screen = NULL;
 
@@ -953,9 +946,6 @@ meta_display_close (MetaDisplay *display,
 
   if (display->leader_window != None)
     XDestroyWindow (display->xdisplay, display->leader_window);
-
-  meta_display_free_window_prop_hooks (display);
-  meta_display_free_group_prop_hooks (display);
 
   meta_display_shutdown_keys (display);
 

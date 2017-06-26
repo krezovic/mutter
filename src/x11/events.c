@@ -1473,7 +1473,7 @@ handle_other_xevent (MetaDisplay *display,
         else if (property_for_window && !frame_was_receiver)
           meta_window_x11_property_notify (property_for_window, event);
 
-        group = meta_display_lookup_group (display,
+        group = meta_display_lookup_group (display->x11_display,
                                            event->xproperty.window);
         if (group != NULL)
           meta_group_property_notify (group, event);

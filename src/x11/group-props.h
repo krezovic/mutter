@@ -30,7 +30,7 @@ void meta_group_reload_property         (MetaGroup   *group,
 void meta_group_reload_properties       (MetaGroup   *group,
                                          const Atom  *properties,
                                          int          n_properties);
-void meta_display_init_group_prop_hooks (MetaDisplay *display);
-void meta_display_free_group_prop_hooks (MetaDisplay *display);
+void meta_display_init_group_prop_hooks (MetaX11Display *display);
+void meta_display_free_group_prop_hooks (MetaX11Display *display);
 
 #endif /* META_GROUP_PROPS_H */

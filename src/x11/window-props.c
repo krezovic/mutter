@@ -55,6 +55,9 @@
 #define HOST_NAME_MAX 255
 #endif
 
+#define XDISPLAY(x) (x->display->x11_display->xdisplay)
+#define XATOM(x, y) (x->display->x11_display->y)
+
 typedef void (* ReloadValueFunc) (MetaWindow    *window,
                                   MetaPropValue *value,
                                   gboolean       initial);
@@ -82,8 +85,8 @@ static void reload_prop_value          (MetaWindow          *window,
                                         MetaWindowPropHooks *hooks,
                                         MetaPropValue       *value,
                                         gboolean             initial);
-static MetaWindowPropHooks* find_hooks (MetaDisplay *display,
-                                        Atom         property);
+static MetaWindowPropHooks* find_hooks (MetaX11Display *display,
+                                        Atom            property);
 
 
 void
@@ -95,7 +98,7 @@ meta_window_reload_property_from_xwindow (MetaWindow      *window,
   MetaPropValue value = { 0, };
   MetaWindowPropHooks *hooks;
 
-  hooks = find_hooks (window->display, property);
+  hooks = find_hooks (window->display->x11_display, property);
   if (!hooks)
     return;
 
@@ -131,12 +134,12 @@ meta_window_load_initial_properties (MetaWindow *window)
   MetaPropValue *values;
   int n_properties = 0;
 
-  values = g_new0 (MetaPropValue, window->display->n_prop_hooks);
+  values = g_new0 (MetaPropValue, window->display->x11_display->n_prop_hooks);
 
   j = 0;
-  for (i = 0; i < window->display->n_prop_hooks; i++)
+  for (i = 0; i < window->display->x11_display->n_prop_hooks; i++)
     {
-      MetaWindowPropHooks *hooks = &window->display->prop_hooks_table[i];
+      MetaWindowPropHooks *hooks = &window->display->x11_display->prop_hooks_table[i];
       if (hooks->flags & LOAD_INIT)
         {
           init_prop_value (window, hooks, &values[j]);
@@ -149,9 +152,9 @@ meta_window_load_initial_properties (MetaWindow *window)
                         values, n_properties);
 
   j = 0;
-  for (i = 0; i < window->display->n_prop_hooks; i++)
+  for (i = 0; i < window->display->x11_display->n_prop_hooks; i++)
     {
-      MetaWindowPropHooks *hooks = &window->display->prop_hooks_table[i];
+      MetaWindowPropHooks *hooks = &window->display->x11_display->prop_hooks_table[i];
       if (hooks->flags & LOAD_INIT)
         {
           /* If we didn't actually manage to load anything then we don't need
@@ -255,20 +258,20 @@ reload_net_wm_window_type (MetaWindow    *window,
           /* We break as soon as we find one we recognize,
            * supposed to prefer those near the front of the list
            */
-          if (atom == window->display->atom__NET_WM_WINDOW_TYPE_DESKTOP ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_DOCK ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_TOOLBAR ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_MENU ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_UTILITY ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_SPLASH ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_DIALOG ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_DROPDOWN_MENU ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_POPUP_MENU ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_TOOLTIP ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_NOTIFICATION ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_COMBO ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_DND ||
-              atom == window->display->atom__NET_WM_WINDOW_TYPE_NORMAL)
+          if (atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_DESKTOP) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_DOCK) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_TOOLBAR) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_MENU) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_UTILITY) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_SPLASH) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_DIALOG) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_DROPDOWN_MENU) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_POPUP_MENU) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_TOOLTIP) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_NOTIFICATION) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_COMBO) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_DND) ||
+              atom == XATOM(window, atom__NET_WM_WINDOW_TYPE_NORMAL))
             {
               priv->type_atom = atom;
               break;
@@ -297,7 +300,7 @@ reload_net_wm_icon (MetaWindow    *window,
                     MetaPropValue *value,
                     gboolean       initial)
 {
-  reload_icon (window, window->display->atom__NET_WM_ICON);
+  reload_icon (window, XATOM(window, atom__NET_WM_ICON));
 }
 
 static void
@@ -305,7 +308,7 @@ reload_kwm_win_icon (MetaWindow    *window,
                      MetaPropValue *value,
                      gboolean       initial)
 {
-  reload_icon (window, window->display->atom__KWM_WIN_ICON);
+  reload_icon (window, XATOM(window, atom__KWM_WIN_ICON));
 }
 
 static void
@@ -470,7 +473,7 @@ reload_net_wm_user_time_window (MetaWindow    *window,
           meta_x11_display_unregister_x_window (window->display->x11_display,
                                                 window->user_time_window);
           /* Don't get events on not-managed windows */
-          XSelectInput (window->display->xdisplay,
+          XSelectInput (XDISPLAY(window),
                         window->user_time_window,
                         NoEventMask);
         }
@@ -507,7 +510,7 @@ reload_net_wm_user_time_window (MetaWindow    *window,
                                               &window->user_time_window,
                                               window);
           /* Just listen for property notify events */
-          XSelectInput (window->display->xdisplay,
+          XSelectInput (XDISPLAY(window),
                         window->user_time_window,
                         PropertyChangeMask);
 
@@ -518,7 +521,7 @@ reload_net_wm_user_time_window (MetaWindow    *window,
           meta_window_reload_property_from_xwindow (
             window,
             window->user_time_window,
-            window->display->atom__NET_WM_USER_TIME,
+            XATOM(window, atom__NET_WM_USER_TIME),
             initial);
         }
     }
@@ -575,7 +578,7 @@ set_title_text (MetaWindow  *window,
   if (!modified && previous_was_modified)
     {
       meta_error_trap_push ();
-      XDeleteProperty (window->display->xdisplay,
+      XDeleteProperty (XDISPLAY(window),
                        window->xwindow,
                        atom);
       meta_error_trap_pop ();
@@ -597,7 +600,7 @@ set_window_title (MetaWindow *window,
     set_title_text (window,
                     priv->using_net_wm_visible_name,
                     title,
-                    window->display->atom__NET_WM_VISIBLE_NAME,
+                    XATOM(window, atom__NET_WM_VISIBLE_NAME),
                     &new_title);
   priv->using_net_wm_visible_name = modified;
 
@@ -811,32 +814,32 @@ reload_net_wm_state (MetaWindow    *window,
   i = 0;
   while (i < value->v.atom_list.n_atoms)
     {
-      if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_SHADED)
+      if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_SHADED))
         window->shaded = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_MAXIMIZED_HORZ)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_MAXIMIZED_HORZ))
         window->maximize_horizontally_after_placement = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_MAXIMIZED_VERT)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_MAXIMIZED_VERT))
         window->maximize_vertically_after_placement = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_HIDDEN)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_HIDDEN))
         window->minimize_after_placement = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_MODAL)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_MODAL))
         priv->wm_state_modal = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_SKIP_TASKBAR)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_SKIP_TASKBAR))
         priv->wm_state_skip_taskbar = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_SKIP_PAGER)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_SKIP_PAGER))
         priv->wm_state_skip_pager = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_FULLSCREEN)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_FULLSCREEN))
         {
           window->fullscreen = TRUE;
           g_object_notify (G_OBJECT (window), "fullscreen");
         }
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_ABOVE)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_ABOVE))
         window->wm_state_above = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_BELOW)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_BELOW))
         window->wm_state_below = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_DEMANDS_ATTENTION)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_DEMANDS_ATTENTION))
         window->wm_state_demands_attention = TRUE;
-      else if (value->v.atom_list.atoms[i] == window->display->atom__NET_WM_STATE_STICKY)
+      else if (value->v.atom_list.atoms[i] == XATOM(window, atom__NET_WM_STATE_STICKY))
         window->on_all_workspaces_requested = TRUE;
 
       ++i;
@@ -1536,13 +1539,13 @@ reload_wm_protocols (MetaWindow    *window,
   while (i < value->v.atom_list.n_atoms)
     {
       if (value->v.atom_list.atoms[i] ==
-          window->display->atom_WM_TAKE_FOCUS)
+          XATOM(window, atom_WM_TAKE_FOCUS))
         window->take_focus = TRUE;
       else if (value->v.atom_list.atoms[i] ==
-               window->display->atom_WM_DELETE_WINDOW)
+               XATOM(window, atom_WM_DELETE_WINDOW))
         window->delete_window = TRUE;
       else if (value->v.atom_list.atoms[i] ==
-               window->display->atom__NET_WM_PING)
+               XATOM(window, atom__NET_WM_PING))
         window->can_ping = TRUE;
       ++i;
     }
@@ -1813,7 +1816,7 @@ RELOAD_STRING (gtk_menubar_object_path,     "gtk-menubar-object-path")
  * This value may be NULL, in which case no callback will be called.
  */
 void
-meta_display_init_window_prop_hooks (MetaDisplay *display)
+meta_display_init_window_prop_hooks (MetaX11Display *display)
 {
   /* The ordering here is significant for the properties we load
    * initially: they are roughly ordered in the order we want them to
@@ -1899,7 +1902,7 @@ meta_display_init_window_prop_hooks (MetaDisplay *display)
 }
 
 void
-meta_display_free_window_prop_hooks (MetaDisplay *display)
+meta_display_free_window_prop_hooks (MetaX11Display *display)
 {
   g_hash_table_unref (display->prop_hooks);
   display->prop_hooks = NULL;
@@ -1909,8 +1912,8 @@ meta_display_free_window_prop_hooks (MetaDisplay *display)
 }
 
 static MetaWindowPropHooks*
-find_hooks (MetaDisplay *display,
-            Atom         property)
+find_hooks (MetaX11Display *display,
+            Atom            property)
 {
   return g_hash_table_lookup (display->prop_hooks,
                               GINT_TO_POINTER (property));

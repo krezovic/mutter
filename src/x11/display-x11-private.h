@@ -41,6 +41,9 @@
 
 #include <X11/extensions/sync.h>
 
+typedef struct _MetaWindowPropHooks MetaWindowPropHooks;
+typedef struct _MetaGroupPropHooks  MetaGroupPropHooks;
+
 typedef gboolean (*MetaAlarmFilter) (MetaX11Display        *display,
                                      XSyncAlarmNotifyEvent *event,
                                      gpointer               data);
@@ -68,6 +71,17 @@ struct _MetaX11Display
 
   MetaAlarmFilter alarm_filter;
   gpointer alarm_filter_data;
+
+  /* Managed by window-props.c */
+  MetaWindowPropHooks *prop_hooks_table;
+  GHashTable *prop_hooks;
+  int n_prop_hooks;
+
+  /* Managed by group-props.c */
+  MetaGroupPropHooks *group_prop_hooks;
+
+  /* Managed by group.c */
+  GHashTable *groups_by_leader;
 
   int composite_event_base;
   int composite_error_base;

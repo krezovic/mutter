@@ -20,16 +20,17 @@
  */
 
 #include <config.h>
+#include "display-x11-private.h"
 #include "group-props.h"
 #include "group-private.h"
 #include "xprops.h"
 #include <X11/Xatom.h>
 
-typedef void (* InitValueFunc)   (MetaDisplay   *display,
-                                  Atom           property,
-                                  MetaPropValue *value);
-typedef void (* ReloadValueFunc) (MetaGroup     *group,
-                                  MetaPropValue *value);
+typedef void (* InitValueFunc)   (MetaX11Display *display,
+                                  Atom            property,
+                                  MetaPropValue  *value);
+typedef void (* ReloadValueFunc) (MetaGroup      *group,
+                                  MetaPropValue  *value);
 
 struct _MetaGroupPropHooks
 {
@@ -38,13 +39,13 @@ struct _MetaGroupPropHooks
   ReloadValueFunc reload_func;
 };
 
-static void                init_prop_value   (MetaDisplay   *display,
-                                              Atom           property,
-                                              MetaPropValue *value);
-static void                reload_prop_value (MetaGroup     *group,
-                                              MetaPropValue *value);
-static MetaGroupPropHooks* find_hooks        (MetaDisplay   *display,
-                                              Atom           property);
+static void                init_prop_value   (MetaX11Display   *display,
+                                              Atom              property,
+                                              MetaPropValue    *value);
+static void                reload_prop_value (MetaGroup        *group,
+                                              MetaPropValue    *value);
+static MetaGroupPropHooks* find_hooks        (MetaX11Display   *display,
+                                              Atom              property);
 
 
 
@@ -75,7 +76,7 @@ meta_group_reload_properties (MetaGroup  *group,
       ++i;
     }
 
-  meta_prop_get_values (group->display, group->group_leader,
+  meta_prop_get_values (group->display->display, group->group_leader,
                         values, n_properties);
 
   i = 0;
@@ -93,9 +94,9 @@ meta_group_reload_properties (MetaGroup  *group,
 
 /* Fill in the MetaPropValue used to get the value of "property" */
 static void
-init_prop_value (MetaDisplay   *display,
-                 Atom           property,
-                 MetaPropValue *value)
+init_prop_value (MetaX11Display   *display,
+                 Atom              property,
+                 MetaPropValue    *value)
 {
   MetaGroupPropHooks *hooks;
 
@@ -119,9 +120,9 @@ reload_prop_value (MetaGroup    *group,
 }
 
 static void
-init_wm_client_machine (MetaDisplay   *display,
-                        Atom           property,
-                        MetaPropValue *value)
+init_wm_client_machine (MetaX11Display   *display,
+                        Atom              property,
+                        MetaPropValue    *value)
 {
   value->type = META_PROP_VALUE_STRING;
   value->atom = display->atom_WM_CLIENT_MACHINE;
@@ -142,9 +143,9 @@ reload_wm_client_machine (MetaGroup     *group,
 }
 
 static void
-init_net_startup_id (MetaDisplay   *display,
-                     Atom           property,
-                     MetaPropValue *value)
+init_net_startup_id (MetaX11Display   *display,
+                     Atom              property,
+                     MetaPropValue    *value)
 {
   value->type = META_PROP_VALUE_UTF8;
   value->atom = display->atom__NET_STARTUP_ID;
@@ -167,7 +168,7 @@ reload_net_startup_id (MetaGroup     *group,
 #define N_HOOKS 3
 
 void
-meta_display_init_group_prop_hooks (MetaDisplay *display)
+meta_display_init_group_prop_hooks (MetaX11Display *display)
 {
   int i;
   MetaGroupPropHooks *hooks;
@@ -201,7 +202,7 @@ meta_display_init_group_prop_hooks (MetaDisplay *display)
 }
 
 void
-meta_display_free_group_prop_hooks (MetaDisplay *display)
+meta_display_free_group_prop_hooks (MetaX11Display *display)
 {
   g_assert (display->group_prop_hooks != NULL);
 
@@ -210,8 +211,8 @@ meta_display_free_group_prop_hooks (MetaDisplay *display)
 }
 
 static MetaGroupPropHooks*
-find_hooks (MetaDisplay *display,
-            Atom         property)
+find_hooks (MetaX11Display *display,
+            Atom            property)
 {
   int i;
 

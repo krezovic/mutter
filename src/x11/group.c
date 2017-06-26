@@ -27,6 +27,7 @@
 
 #include <config.h>
 #include <meta/util.h>
+#include "display-x11-private.h"
 #include "group-private.h"
 #include "group-props.h"
 #include "window-private.h"
@@ -34,8 +35,8 @@
 #include <X11/Xlib-xcb.h>
 
 static MetaGroup*
-meta_group_new (MetaDisplay *display,
-                Window       group_leader)
+meta_group_new (MetaX11Display *display,
+                Window          group_leader)
 {
   MetaGroup *group;
 #define N_INITIAL_PROPS 3
@@ -150,15 +151,15 @@ meta_window_compute_group (MetaWindow* window)
    */
   ancestor = meta_window_find_root_ancestor (window);
 
-  if (window->display->groups_by_leader)
+  if (window->display->x11_display->groups_by_leader)
     {
       if (ancestor != window)
         group = ancestor->group;
       else if (window->xgroup_leader != None)
-        group = g_hash_table_lookup (window->display->groups_by_leader,
+        group = g_hash_table_lookup (window->display->x11_display->groups_by_leader,
                                      &window->xgroup_leader);
       else
-        group = g_hash_table_lookup (window->display->groups_by_leader,
+        group = g_hash_table_lookup (window->display->x11_display->groups_by_leader,
                                      &window->xwindow);
     }
 
@@ -170,13 +171,13 @@ meta_window_compute_group (MetaWindow* window)
   else
     {
       if (ancestor != window && ancestor->xgroup_leader != None)
-        group = meta_group_new (window->display,
+        group = meta_group_new (window->display->x11_display,
                                 ancestor->xgroup_leader);
       else if (window->xgroup_leader != None)
-        group = meta_group_new (window->display,
+        group = meta_group_new (window->display->x11_display,
                                 window->xgroup_leader);
       else
-        group = meta_group_new (window->display,
+        group = meta_group_new (window->display->x11_display,
                                 window->xwindow);
 
       window->group = group;
@@ -229,8 +230,8 @@ meta_window_shutdown_group (MetaWindow *window)
  *
  */
 MetaGroup*
-meta_display_lookup_group (MetaDisplay *display,
-                           Window       group_leader)
+meta_display_lookup_group (MetaX11Display *display,
+                           Window          group_leader)
 {
   MetaGroup *group;
 

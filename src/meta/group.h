@@ -34,8 +34,8 @@ void       meta_window_shutdown_group  (MetaWindow *window);
 void       meta_window_group_leader_changed (MetaWindow *window);
 
 /* note, can return NULL */
-MetaGroup* meta_display_lookup_group   (MetaDisplay *display,
-                                        Window       group_leader);
+MetaGroup* meta_display_lookup_group   (MetaX11Display *display,
+                                        Window          group_leader);
 
 GSList*    meta_group_list_windows     (MetaGroup *group);
 
