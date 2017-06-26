@@ -39,6 +39,7 @@
 
 #include "backends/x11/meta-backend-x11.h"
 
+#include <meta/errors.h>
 #include <meta/main.h>
 #include <meta/meta-backend.h>
 
@@ -56,6 +57,7 @@
 
 #include <X11/Xatom.h>
 
+#include "x11/events.h"
 #include "x11/group-props.h"
 #include "x11/window-props.h"
 #include "x11/xprops.h"
@@ -172,6 +174,10 @@ meta_x11_display_open (MetaDisplay *display)
   x11_display->name = g_strdup (XDisplayName (NULL));
   x11_display->xdisplay = xdisplay;
 
+  x11_display->focus_serial = 0;
+  x11_display->server_focus_window = None;
+  x11_display->server_focus_serial = 0;
+
   meta_verbose ("Creating %d atoms\n", (int) G_N_ELEMENTS (atom_names));
   XInternAtoms (xdisplay, (char **)atom_names, G_N_ELEMENTS (atom_names),
                 False, atoms);
@@ -203,6 +209,8 @@ meta_x11_display_open (MetaDisplay *display)
   x11_display->timestamp_pinging_window = None;
 
   x11_display->groups_by_leader = NULL;
+
+  meta_display_init_events_x11 (x11_display);
 
   x11_display->xids = g_hash_table_new (meta_unsigned_long_hash,
                                         meta_unsigned_long_equal);
@@ -435,6 +443,7 @@ meta_x11_display_open (MetaDisplay *display)
                                   DefaultRootWindow (xdisplay),
                                   PropertyChangeMask);
 
+  x11_display->last_focus_time = x11_display->timestamp;
 
   return TRUE;
 }
@@ -450,6 +459,9 @@ meta_x11_display_close (MetaX11Display  *display,
   meta_prefs_remove_listener (prefs_changed_callback, display);
 
   meta_bell_shutdown (display);
+
+  /* Stop caring about events */
+  meta_display_free_events_x11 (display);
 
   /* Must be after all calls to meta_window_unmanage() since they
    * unregister windows
@@ -663,4 +675,124 @@ update_cursor_theme (void)
         set_cursor_theme (xdisplay);
       }
   }
+}
+
+gboolean
+meta_x11_display_timestamp_too_old (MetaX11Display *display,
+                                    guint32        *timestamp)
+{
+  /* FIXME: If Soeren's suggestion in bug 151984 is implemented, it will allow
+   * us to sanity check the timestamp here and ensure it doesn't correspond to
+   * a future time (though we would want to rename to
+   * timestamp_too_old_or_in_future).
+   */
+
+  if (*timestamp == CurrentTime)
+    {
+      *timestamp = meta_x11_display_get_current_time_roundtrip (display);
+      return FALSE;
+    }
+  else if (XSERVER_TIME_IS_BEFORE (*timestamp, display->last_focus_time))
+    {
+      if (XSERVER_TIME_IS_BEFORE (*timestamp, display->display->last_user_time))
+        return TRUE;
+      else
+        {
+          *timestamp = display->last_focus_time;
+          return FALSE;
+        }
+    }
+
+  return FALSE;
+}
+
+static void
+request_xserver_input_focus_change (MetaX11Display *display,
+                                    MetaScreen     *screen,
+                                    MetaWindow     *meta_window,
+                                    Window          xwindow,
+                                    guint32         timestamp)
+{
+  gulong serial;
+
+  if (meta_x11_display_timestamp_too_old (display, &timestamp))
+    return;
+
+  meta_error_trap_push ();
+
+  /* In order for mutter to know that the focus request succeeded, we track
+   * the serial of the "focus request" we made, but if we take the serial
+   * of the XSetInputFocus request, then there's no way to determine the
+   * difference between focus events as a result of the SetInputFocus and
+   * focus events that other clients send around the same time. Ensure that
+   * we know which is which by making two requests that the server will
+   * process at the same time.
+   */
+  XGrabServer (display->xdisplay);
+
+  serial = XNextRequest (display->xdisplay);
+
+  XSetInputFocus (display->xdisplay,
+                  xwindow,
+                  RevertToPointerRoot,
+                  timestamp);
+
+  XChangeProperty (display->xdisplay, display->timestamp_pinging_window,
+                   display->atom__MUTTER_FOCUS_SET,
+                   XA_STRING, 8, PropModeAppend, NULL, 0);
+
+  XUngrabServer (display->xdisplay);
+  XFlush (display->xdisplay);
+
+  meta_display_update_focus_window (display->display,
+                                    meta_window,
+                                    xwindow,
+                                    serial,
+                                    TRUE);
+
+  meta_error_trap_pop ();
+
+  display->last_focus_time = timestamp;
+
+  if (meta_window == NULL || meta_window != display->display->autoraise_window)
+    meta_display_remove_autoraise_callback (display->display);
+}
+
+/* TODO: Split into non-X11 functions */
+void
+meta_display_set_input_focus_window (MetaDisplay *display,
+                                     MetaWindow  *window,
+                                     gboolean     focus_frame,
+                                     guint32      timestamp)
+{
+  request_xserver_input_focus_change (display->x11_display,
+                                      window->screen,
+                                      window,
+                                      focus_frame ? window->frame->xwindow : window->xwindow,
+                                      timestamp);
+}
+
+void
+meta_display_set_input_focus_xwindow (MetaDisplay *display,
+                                      MetaScreen  *screen,
+                                      Window       window,
+                                      guint32      timestamp)
+{
+  request_xserver_input_focus_change (display->x11_display,
+                                      screen,
+                                      NULL,
+                                      window,
+                                      timestamp);
+}
+
+void
+meta_display_focus_the_no_focus_window (MetaDisplay *display,
+                                        MetaScreen  *screen,
+                                        guint32      timestamp)
+{
+  request_xserver_input_focus_change (display->x11_display,
+                                      screen,
+                                      NULL,
+                                      screen->no_focus_window,
+                                      timestamp);
 }

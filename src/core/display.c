@@ -566,9 +566,6 @@ meta_display_open (void)
   display->autoraise_timeout_id = 0;
   display->autoraise_window = NULL;
   display->focus_window = NULL;
-  display->focus_serial = 0;
-  display->server_focus_window = None;
-  display->server_focus_serial = 0;
 
   display->mouse_mode = TRUE; /* Only relevant for mouse or sloppy focus */
   display->allow_terminal_deactivation = TRUE; /* Only relevant for when a
@@ -635,9 +632,6 @@ meta_display_open (void)
     display->have_xinput_23 = display->x11_display->have_xinput_23;
   }
 
-  meta_display_init_events_x11 (display);
-
-  display->last_focus_time = timestamp;
   display->last_user_time = timestamp;
   display->compositor = NULL;
 
@@ -833,7 +827,6 @@ meta_display_close (MetaDisplay *display,
   display->focus_timeout_id = 0;
 
   /* Stop caring about events */
-  meta_display_free_events_x11 (display);
   meta_display_free_events (display);
 
   if (display->screen)
@@ -874,7 +867,8 @@ meta_display_close (MetaDisplay *display,
 MetaDisplay*
 meta_display_for_x_display (Display *xdisplay)
 {
-  if (the_display->xdisplay == xdisplay)
+  if (the_display->x11_display &&
+      the_display->x11_display->xdisplay == xdisplay)
     return the_display;
 
   meta_warning ("Could not find display for X display %p, probably going to crash\n",
@@ -1097,7 +1091,7 @@ meta_display_sync_wayland_input_focus (MetaDisplay *display)
 
   if (!meta_display_windows_are_interactable (display))
     focus_window = NULL;
-  else if (meta_display_xwindow_is_a_no_focus_window (display, display->focus_xwindow))
+  else if (meta_display_xwindow_is_a_no_focus_window (display, display->x11_display->focus_xwindow))
     focus_window = NULL;
   else if (display->focus_window && display->focus_window->surface)
     focus_window = display->focus_window;
@@ -1118,10 +1112,10 @@ meta_display_update_focus_window (MetaDisplay *display,
                                   gulong       serial,
                                   gboolean     focused_by_us)
 {
-  display->focus_serial = serial;
+  display->x11_display->focus_serial = serial;
   display->focused_by_us = focused_by_us;
 
-  if (display->focus_xwindow == xwindow &&
+  if (display->x11_display->focus_xwindow == xwindow &&
       display->focus_window == window)
     return;
 
@@ -1139,13 +1133,13 @@ meta_display_update_focus_window (MetaDisplay *display,
        */
       previous = display->focus_window;
       display->focus_window = NULL;
-      display->focus_xwindow = None;
+      display->x11_display->focus_xwindow = None;
 
       meta_window_set_focused_internal (previous, FALSE);
     }
 
   display->focus_window = window;
-  display->focus_xwindow = xwindow;
+  display->x11_display->focus_xwindow = xwindow;
 
   if (display->focus_window)
     {
@@ -1161,87 +1155,6 @@ meta_display_update_focus_window (MetaDisplay *display,
 
   g_object_notify (G_OBJECT (display), "focus-window");
   meta_display_update_active_window_hint (display);
-}
-
-gboolean
-meta_display_timestamp_too_old (MetaDisplay *display,
-                                guint32     *timestamp)
-{
-  /* FIXME: If Soeren's suggestion in bug 151984 is implemented, it will allow
-   * us to sanity check the timestamp here and ensure it doesn't correspond to
-   * a future time (though we would want to rename to
-   * timestamp_too_old_or_in_future).
-   */
-
-  if (*timestamp == CurrentTime)
-    {
-      *timestamp = meta_display_get_current_time_roundtrip (display);
-      return FALSE;
-    }
-  else if (XSERVER_TIME_IS_BEFORE (*timestamp, display->last_focus_time))
-    {
-      if (XSERVER_TIME_IS_BEFORE (*timestamp, display->last_user_time))
-        return TRUE;
-      else
-        {
-          *timestamp = display->last_focus_time;
-          return FALSE;
-        }
-    }
-
-  return FALSE;
-}
-
-static void
-request_xserver_input_focus_change (MetaDisplay *display,
-                                    MetaScreen  *screen,
-                                    MetaWindow  *meta_window,
-                                    Window       xwindow,
-                                    guint32      timestamp)
-{
-  gulong serial;
-
-  if (meta_display_timestamp_too_old (display, &timestamp))
-    return;
-
-  meta_error_trap_push ();
-
-  /* In order for mutter to know that the focus request succeeded, we track
-   * the serial of the "focus request" we made, but if we take the serial
-   * of the XSetInputFocus request, then there's no way to determine the
-   * difference between focus events as a result of the SetInputFocus and
-   * focus events that other clients send around the same time. Ensure that
-   * we know which is which by making two requests that the server will
-   * process at the same time.
-   */
-  XGrabServer (display->xdisplay);
-
-  serial = XNextRequest (display->xdisplay);
-
-  XSetInputFocus (display->xdisplay,
-                  xwindow,
-                  RevertToPointerRoot,
-                  timestamp);
-
-  XChangeProperty (display->xdisplay, display->x11_display->timestamp_pinging_window,
-                   display->atom__MUTTER_FOCUS_SET,
-                   XA_STRING, 8, PropModeAppend, NULL, 0);
-
-  XUngrabServer (display->xdisplay);
-  XFlush (display->xdisplay);
-
-  meta_display_update_focus_window (display,
-                                    meta_window,
-                                    xwindow,
-                                    serial,
-                                    TRUE);
-
-  meta_error_trap_pop ();
-
-  display->last_focus_time = timestamp;
-
-  if (meta_window == NULL || meta_window != display->autoraise_window)
-    meta_display_remove_autoraise_callback (display);
 }
 
 void
@@ -2343,14 +2256,14 @@ void
 meta_display_sanity_check_timestamps (MetaDisplay *display,
                                       guint32      timestamp)
 {
-  if (XSERVER_TIME_IS_BEFORE (timestamp, display->last_focus_time))
+  if (XSERVER_TIME_IS_BEFORE (timestamp, display->x11_display->last_focus_time))
     {
       meta_warning ("last_focus_time (%u) is greater than comparison "
                     "timestamp (%u).  This most likely represents a buggy "
                     "client sending inaccurate timestamps in messages such as "
                     "_NET_ACTIVE_WINDOW.  Trying to work around...\n",
-                    display->last_focus_time, timestamp);
-      display->last_focus_time = timestamp;
+                    display->x11_display->last_focus_time, timestamp);
+      display->x11_display->last_focus_time = timestamp;
     }
   if (XSERVER_TIME_IS_BEFORE (timestamp, display->last_user_time))
     {
@@ -2383,44 +2296,6 @@ meta_display_sanity_check_timestamps (MetaDisplay *display,
 
       g_slist_free (windows);
     }
-}
-
-void
-meta_display_set_input_focus_window (MetaDisplay *display,
-                                     MetaWindow  *window,
-                                     gboolean     focus_frame,
-                                     guint32      timestamp)
-{
-  request_xserver_input_focus_change (display,
-                                      window->screen,
-                                      window,
-                                      focus_frame ? window->frame->xwindow : window->xwindow,
-                                      timestamp);
-}
-
-void
-meta_display_set_input_focus_xwindow (MetaDisplay *display,
-                                      MetaScreen  *screen,
-                                      Window       window,
-                                      guint32      timestamp)
-{
-  request_xserver_input_focus_change (display,
-                                      screen,
-                                      NULL,
-                                      window,
-                                      timestamp);
-}
-
-void
-meta_display_focus_the_no_focus_window (MetaDisplay *display,
-                                        MetaScreen  *screen,
-                                        guint32      timestamp)
-{
-  request_xserver_input_focus_change (display,
-                                      screen,
-                                      NULL,
-                                      screen->no_focus_window,
-                                      timestamp);
 }
 
 void

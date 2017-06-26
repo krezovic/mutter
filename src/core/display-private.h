@@ -117,23 +117,12 @@ struct _MetaDisplay
 #include <x11/atomnames.h>
 #undef item
 
-  /* The window and serial of the most recent FocusIn event. */
-  Window server_focus_window;
-  gulong server_focus_serial;
-
   /* Our best guess as to the "currently" focused window (that is, the
    * window that we expect will be focused at the point when the X
    * server processes our next request), and the serial of the request
    * or event that caused this.
    */
   MetaWindow *focus_window;
-  /* For windows we've focused that don't necessarily have an X window,
-   * like the no_focus_window or the stage X window. */
-  Window focus_xwindow;
-  gulong focus_serial;
-
-  /* last timestamp passed to XSetInputFocus */
-  guint32 last_focus_time;
 
   /* last user interaction time in any app */
   guint32 last_user_time;
@@ -406,8 +395,6 @@ void meta_display_update_focus_window (MetaDisplay *display,
 
 void meta_display_sanity_check_timestamps (MetaDisplay *display,
                                            guint32      timestamp);
-gboolean meta_display_timestamp_too_old (MetaDisplay *display,
-                                         guint32     *timestamp);
 
 void meta_display_remove_pending_pings_for_window (MetaDisplay *display,
                                                    MetaWindow  *window);

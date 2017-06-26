@@ -25,7 +25,7 @@
 #ifndef META_EVENTS_X11_H
 #define META_EVENTS_X11_H
 
-void meta_display_init_events_x11 (MetaDisplay *display);
-void meta_display_free_events_x11 (MetaDisplay *display);
+void meta_display_init_events_x11 (MetaX11Display *display);
+void meta_display_free_events_x11 (MetaX11Display *display);
 
 #endif

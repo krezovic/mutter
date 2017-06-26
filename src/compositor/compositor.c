@@ -305,7 +305,7 @@ meta_stage_is_focused (MetaScreen *screen)
   if (window == None)
     return FALSE;
 
-  return (screen->display->focus_xwindow == window);
+  return (screen->display->x11_display->focus_xwindow == window);
 }
 
 static gboolean

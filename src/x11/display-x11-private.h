@@ -70,6 +70,18 @@ struct _MetaX11Display
 #include <x11/atomnames.h>
 #undef item
 
+  /* The window and serial of the most recent FocusIn event. */
+  Window server_focus_window;
+  gulong server_focus_serial;
+
+  /* For windows we've focused that don't necessarily have an X window,
+   * like the no_focus_window or the stage X window. */
+  Window focus_xwindow;
+  gulong focus_serial;
+
+  /* last timestamp passed to XSetInputFocus */
+  guint32 last_focus_time;
+
   GHashTable *xids;
 
   int         xkb_base_event_type;
@@ -159,6 +171,9 @@ void        meta_x11_display_set_alarm_filter (MetaX11Display *display,
 gboolean meta_x11_display_process_barrier_xevent (MetaX11Display *display,
                                                   XIEvent        *event);
 #endif /* HAVE_XI23 */
+
+gboolean meta_x11_display_timestamp_too_old (MetaX11Display *display,
+                                             guint32        *timestamp);
 
 guint32 meta_x11_display_get_current_time_roundtrip (MetaX11Display *display);
 
