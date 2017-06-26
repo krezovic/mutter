@@ -280,6 +280,9 @@ libmutter_@LIBMUTTER_API_VERSION@_la_SOURCES =	\
 	ui/theme-private.h			\
 	ui/ui.c					\
 	x11/atomnames.h				\
+	x11/display-x11.c			\
+	x11/display-x11.h			\
+	x11/display-x11-private.h		\
 	x11/events.c				\
 	x11/events.h				\
 	x11/group-private.h			\

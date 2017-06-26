@@ -69,6 +69,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "x11/display-x11-private.h"
 #include "x11/events.h"
 #include "x11/window-x11.h"
 #include "x11/window-props.h"
@@ -623,6 +624,9 @@ meta_display_open (void)
 
   display->closing = 0;
 
+  meta_x11_display_open (display);
+  g_assert (display->x11_display != NULL);
+
   /* here we use XDisplayName which is what the user
    * probably put in, vs. DisplayString(display) which is
    * canonicalized by XOpenDisplay()
@@ -1155,6 +1159,8 @@ meta_display_close (MetaDisplay *display,
 
   if (display->compositor)
     meta_compositor_destroy (display->compositor);
+
+  meta_x11_display_close (display->x11_display, timestamp);
 
   g_object_unref (display);
   the_display = NULL;
