@@ -32,6 +32,20 @@
 
 #include "display-x11-private.h"
 
+#include "display-private.h"
+#include "frame.h"
+#include "util-private.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <X11/Xatom.h>
+
+#ifdef HAVE_WAYLAND
+#include "wayland/meta-xwayland-private.h"
+#endif
+
 G_DEFINE_TYPE(MetaX11Display, meta_x11_display, G_TYPE_OBJECT);
 
 static void
@@ -58,6 +72,35 @@ gboolean
 meta_x11_display_open (MetaDisplay *display)
 {
   MetaX11Display *x11_display;
+  Display *xdisplay;
+  int i;
+
+  /* A list of all atom names, so that we can intern them in one go. */
+  const char *atom_names[] = {
+#define item(x) #x,
+#include <x11/atomnames.h>
+#undef item
+  };
+  Atom atoms[G_N_ELEMENTS(atom_names)];
+
+  meta_verbose ("Opening display '%s'\n", XDisplayName (NULL));
+
+  xdisplay = meta_ui_get_display ();
+
+  if (xdisplay == NULL)
+    {
+      meta_warning (_("Failed to open X Window System display “%s”\n"),
+		    XDisplayName (NULL));
+      return FALSE;
+    }
+
+#ifdef HAVE_WAYLAND
+  if (meta_is_wayland_compositor ())
+    meta_xwayland_complete_init ();
+#endif
+
+  if (meta_is_syncing ())
+    XSynchronize (xdisplay, True);
 
   x11_display = g_object_new (META_TYPE_X11_DISPLAY, NULL);
 
@@ -65,6 +108,28 @@ meta_x11_display_open (MetaDisplay *display)
   /* So functions that use meta_get_x11_display () before this function
    * returns don't break */
   display->x11_display = x11_display;
+
+  /* here we use XDisplayName which is what the user
+   * probably put in, vs. DisplayString(display) which is
+   * canonicalized by XOpenDisplay()
+   */
+  x11_display->name = g_strdup (XDisplayName (NULL));
+  x11_display->xdisplay = xdisplay;
+
+  meta_verbose ("Creating %d atoms\n", (int) G_N_ELEMENTS (atom_names));
+  XInternAtoms (xdisplay, (char **)atom_names, G_N_ELEMENTS (atom_names),
+                False, atoms);
+
+  i = 0;
+#define item(x) x11_display->atom_##x = atoms[i++];
+#include <x11/atomnames.h>
+#undef item
+
+  i = 0;
+/* XXX: Transitional */
+#define item(x) display->atom_##x = atoms[i++];
+#include <x11/atomnames.h>
+#undef item
 
   return TRUE;
 }
@@ -76,6 +141,10 @@ meta_x11_display_close (MetaX11Display  *display,
   g_assert (display != NULL);
 
   display->display->x11_display = NULL;
+
+  XFlush (display->xdisplay);
+
+  g_free (display->name);
 
   g_object_unref (display);
 }

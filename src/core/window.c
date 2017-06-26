@@ -52,6 +52,7 @@
 #include <meta/meta-cursor-tracker.h>
 #include "meta/compositor-mutter.h"
 
+#include "x11/display-x11-private.h"
 #include "x11/window-x11.h"
 #include "x11/window-props.h"
 #include "x11/xprops.h"
@@ -756,11 +757,11 @@ sync_client_window_mapped (MetaWindow *window)
   meta_error_trap_push ();
   if (should_be_mapped)
     {
-      XMapWindow (window->display->xdisplay, window->xwindow);
+      XMapWindow (window->display->x11_display->xdisplay, window->xwindow);
     }
   else
     {
-      XUnmapWindow (window->display->xdisplay, window->xwindow);
+      XUnmapWindow (window->display->x11_display->xdisplay, window->xwindow);
       window->unmaps_pending ++;
     }
   meta_error_trap_pop ();

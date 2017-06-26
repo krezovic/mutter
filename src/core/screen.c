@@ -56,13 +56,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "x11/display-x11-private.h"
 #include "x11/window-x11.h"
 #include "x11/xprops.h"
 
 #include "backends/x11/meta-backend-x11.h"
 
-#define XDISPLAY(x) (x->display->xdisplay)
-#define XATOM(x, y) (x->display->y)
+#define XDISPLAY(x) (x->display->x11_display->xdisplay)
+#define XATOM(x, y) (x->display->x11_display->y)
 
 static char* get_screen_name (MetaDisplay *display,
                               int          number);

@@ -80,6 +80,8 @@
 #include "backends/x11/meta-backend-x11.h"
 #include "clutter/clutter-mutter.h"
 
+#include "x11/display-x11-private.h"
+
 #ifdef HAVE_WAYLAND
 #include "wayland/meta-wayland-private.h"
 #endif
@@ -365,10 +367,10 @@ meta_begin_modal_for_plugin (MetaCompositor   *compositor,
     return FALSE;
 
   /* XXX: why is this needed? */
-  XIUngrabDevice (display->xdisplay,
+  XIUngrabDevice (display->x11_display->xdisplay,
                   META_VIRTUAL_CORE_POINTER_ID,
                   timestamp);
-  XSync (display->xdisplay, False);
+  XSync (display->x11_display->xdisplay, False);
 
   if (!grab_devices (options, timestamp))
     return FALSE;
@@ -474,7 +476,7 @@ redirect_windows (MetaScreen *screen)
           /* This probably means that a non-WM compositor like xcompmgr is running;
            * we have no way to get it to exit */
           meta_fatal (_("Another compositing manager is already running on screen %i on display “%s”."),
-                      screen_number, display->name);
+                      screen_number, display->x11_display->name);
         }
 
       n_retries++;
@@ -486,7 +488,7 @@ void
 meta_compositor_manage (MetaCompositor *compositor)
 {
   MetaDisplay *display = compositor->display;
-  Display *xdisplay = display->xdisplay;
+  Display *xdisplay = display->x11_display->xdisplay;
   MetaScreen *screen = display->screen;
   MetaBackend *backend = meta_get_backend ();
 
@@ -1107,7 +1109,7 @@ meta_pre_paint_func (gpointer data)
       if (compositor->have_x11_sync_object)
         compositor->have_x11_sync_object = meta_sync_ring_insert_wait ();
       else
-        XSync (compositor->display->xdisplay, False);
+        XSync (compositor->display->x11_display->xdisplay, False);
     }
 
   return TRUE;

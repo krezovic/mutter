@@ -46,6 +46,7 @@
 
 #include "backends/meta-logical-monitor.h"
 #include "backends/x11/meta-backend-x11.h"
+#include "x11/display-x11-private.h"
 #include "x11/window-x11.h"
 
 #ifdef HAVE_NATIVE_BACKEND
@@ -56,8 +57,8 @@
 #define SCHEMA_MUTTER_KEYBINDINGS "org.gnome.mutter.keybindings"
 #define SCHEMA_MUTTER_WAYLAND_KEYBINDINGS "org.gnome.mutter.wayland.keybindings"
 
-#define XDISPLAY(x) (x->xdisplay)
-#define XATOM(x, y) (x->y)
+#define XDISPLAY(x) (x->x11_display->xdisplay)
+#define XATOM(x, y) (x->x11_display->y)
 
 static gboolean add_builtin_keybinding (MetaDisplay          *display,
                                         const char           *name,

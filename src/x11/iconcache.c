@@ -21,6 +21,7 @@
 
 #include "config.h"
 
+#include "display-x11-private.h"
 #include "iconcache.h"
 
 #include <meta/errors.h>
@@ -32,8 +33,8 @@
 #include <X11/Xatom.h>
 #include <X11/extensions/Xrender.h>
 
-#define XDISPLAY(x) (x->xdisplay)
-#define XATOM(x, y) (x->y)
+#define XDISPLAY(x) (x->x11_display->xdisplay)
+#define XATOM(x, y) (x->x11_display->y)
 
 static gboolean
 find_largest_sizes (gulong *data,

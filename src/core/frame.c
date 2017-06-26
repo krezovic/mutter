@@ -27,12 +27,13 @@
 #include <meta/errors.h>
 #include "keybindings-private.h"
 #include "backends/x11/meta-backend-x11.h"
+#include "x11/display-x11-private.h"
 
 #define EVENT_MASK (SubstructureRedirectMask |                     \
                     StructureNotifyMask | SubstructureNotifyMask | \
                     ExposureMask | FocusChangeMask)
 
-#define XDISPLAY(x) (x->display->xdisplay)
+#define XDISPLAY(x) (x->display->x11_display->xdisplay)
 
 void
 meta_window_ensure_frame (MetaWindow *window)

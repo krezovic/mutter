@@ -30,6 +30,7 @@
 #endif
 
 #include <glib.h>
+#include <X11/Xlib.h>
 
 #include <meta/common.h>
 #include <meta/types.h>
@@ -43,6 +44,16 @@ struct _MetaX11Display
   GObject parent_instance;
 
   MetaDisplay *display;
+
+  char *name;
+  Display *xdisplay;
+
+  /* Pull in all the names of atoms as fields; we will intern them when the
+   * class is constructed.
+   */
+#define item(x)  Atom atom_##x;
+#include <x11/atomnames.h>
+#undef item
 };
 
 struct _MetaX11DisplayClass

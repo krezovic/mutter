@@ -554,7 +554,7 @@ gesture_tracker_state_changed (MetaGestureTracker   *tracker,
       XIAllowTouchEvents (meta_backend_x11_get_xdisplay (backend),
                           META_VIRTUAL_CORE_POINTER_ID,
                           clutter_x11_event_sequence_get_touch_detail (sequence),
-                          DefaultRootWindow (display->xdisplay), event_mode);
+                          DefaultRootWindow (display->x11_display->xdisplay), event_mode);
     }
 }
 
@@ -592,33 +592,6 @@ meta_display_open (void)
   guint32 timestamp;
   Window old_active_xwindow = None;
 
-  /* A list of all atom names, so that we can intern them in one go. */
-  const char *atom_names[] = {
-#define item(x) #x,
-#include <x11/atomnames.h>
-#undef item
-  };
-  Atom atoms[G_N_ELEMENTS(atom_names)];
-
-  meta_verbose ("Opening display '%s'\n", XDisplayName (NULL));
-
-  xdisplay = meta_ui_get_display ();
-
-  if (xdisplay == NULL)
-    {
-      meta_warning (_("Failed to open X Window System display “%s”\n"),
-		    XDisplayName (NULL));
-      return FALSE;
-    }
-
-#ifdef HAVE_WAYLAND
-  if (meta_is_wayland_compositor ())
-    meta_xwayland_complete_init ();
-#endif
-
-  if (meta_is_syncing ())
-    XSynchronize (xdisplay, True);
-
   g_assert (the_display == NULL);
   display = the_display = g_object_new (META_TYPE_DISPLAY, NULL);
 
@@ -627,12 +600,11 @@ meta_display_open (void)
   meta_x11_display_open (display);
   g_assert (display->x11_display != NULL);
 
-  /* here we use XDisplayName which is what the user
-   * probably put in, vs. DisplayString(display) which is
-   * canonicalized by XOpenDisplay()
-   */
-  display->name = g_strdup (XDisplayName (NULL));
+  /* XXX: Transitional */
+  xdisplay = display->x11_display->xdisplay;
+  display->name = display->x11_display->name;
   display->xdisplay = xdisplay;
+
   display->display_opening = TRUE;
 
   display->pending_pings = NULL;
@@ -652,15 +624,6 @@ meta_display_open (void)
   meta_display_init_keys (display);
 
   meta_prefs_add_listener (prefs_changed_callback, display);
-
-  meta_verbose ("Creating %d atoms\n", (int) G_N_ELEMENTS (atom_names));
-  XInternAtoms (display->xdisplay, (char **)atom_names, G_N_ELEMENTS (atom_names),
-                False, atoms);
-
-  i = 0;
-#define item(x) display->atom_##x = atoms[i++];
-#include <x11/atomnames.h>
-#undef item
 
   display->prop_hooks = NULL;
   meta_display_init_window_prop_hooks (display);
@@ -1148,12 +1111,8 @@ meta_display_close (MetaDisplay *display,
   if (display->leader_window != None)
     XDestroyWindow (display->xdisplay, display->leader_window);
 
-  XFlush (display->xdisplay);
-
   meta_display_free_window_prop_hooks (display);
   meta_display_free_group_prop_hooks (display);
-
-  g_free (display->name);
 
   meta_display_shutdown_keys (display);
 
@@ -1900,10 +1859,10 @@ meta_display_begin_grab_op (MetaDisplay *display,
    * pointer operations on the display X11 connection, we need
    * to ungrab here to ensure that the backend's X11 can take
    * the device grab. */
-  XIUngrabDevice (display->xdisplay,
+  XIUngrabDevice (display->x11_display->xdisplay,
                   META_VIRTUAL_CORE_POINTER_ID,
                   timestamp);
-  XSync (display->xdisplay, False);
+  XSync (display->x11_display->xdisplay, False);
 
   if (meta_backend_grab_device (backend, META_VIRTUAL_CORE_POINTER_ID, timestamp))
     display->grab_have_pointer = TRUE;
@@ -2100,8 +2059,9 @@ meta_display_update_active_window_hint (MetaDisplay *display)
     data[0] = None;
 
   meta_error_trap_push ();
-  XChangeProperty (display->xdisplay, display->screen->xroot,
-                   display->atom__NET_ACTIVE_WINDOW,
+  XChangeProperty (display->x11_display->xdisplay,
+                   display->screen->xroot,
+                   display->x11_display->atom__NET_ACTIVE_WINDOW,
                    XA_WINDOW,
                    32, PropModeReplace, (guchar*) data, 1);
   meta_error_trap_pop ();
@@ -2203,7 +2163,7 @@ meta_set_syncing (gboolean setting)
     {
       is_syncing = setting;
       if (meta_get_display ())
-        XSynchronize (meta_get_display ()->xdisplay, is_syncing);
+        XSynchronize (meta_get_x11_display ()->xdisplay, is_syncing);
     }
 }
 
@@ -2665,7 +2625,8 @@ meta_display_unmanage_screen (MetaDisplay *display,
                               guint32      timestamp)
 {
   meta_verbose ("Unmanaging screen %d on display %s\n",
-                meta_ui_get_screen_number (), display->name);
+                meta_ui_get_screen_number (),
+                display->x11_display->name);
   meta_display_close (display, timestamp);
 }
 
@@ -2763,9 +2724,9 @@ meta_display_increment_focus_sentinel (MetaDisplay *display)
 
   data[0] = meta_display_get_current_time (display);
 
-  XChangeProperty (display->xdisplay,
+  XChangeProperty (display->x11_display->xdisplay,
                    display->screen->xroot,
-                   display->atom__MUTTER_SENTINEL,
+                   display->x11_display->atom__MUTTER_SENTINEL,
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
 
@@ -2958,7 +2919,9 @@ meta_display_supports_extended_barriers (MetaDisplay *display)
 Display *
 meta_display_get_xdisplay (MetaDisplay *display)
 {
-  return display->xdisplay;
+  return display->x11_display ?
+         display->x11_display->xdisplay :
+         NULL;
 }
 
 /**
@@ -3025,7 +2988,7 @@ Cursor
 meta_display_create_x_cursor (MetaDisplay *display,
                               MetaCursor   cursor)
 {
-  return meta_cursor_create_x_cursor (display->xdisplay, cursor);
+  return meta_cursor_create_x_cursor (display->x11_display->xdisplay, cursor);
 }
 
 MetaGestureTracker *
