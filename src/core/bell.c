@@ -227,7 +227,7 @@ meta_bell_notify (MetaDisplay *display,
 }
 
 void
-meta_bell_set_audible (MetaDisplay *display, gboolean audible)
+meta_bell_set_audible (MetaX11Display *display, gboolean audible)
 {
 #ifdef HAVE_LIBCANBERRA
   /* When we are playing sounds using libcanberra support, we handle the
@@ -244,7 +244,7 @@ meta_bell_set_audible (MetaDisplay *display, gboolean audible)
 }
 
 gboolean
-meta_bell_init (MetaDisplay *display)
+meta_bell_init (MetaX11Display *display)
 {
   int xkb_base_error_type, xkb_opcode;
 
@@ -279,7 +279,7 @@ meta_bell_init (MetaDisplay *display)
 }
 
 void
-meta_bell_shutdown (MetaDisplay *display)
+meta_bell_shutdown (MetaX11Display *display)
 {
   /* TODO: persist initial bell state in display, reset here */
   XkbChangeEnabledControls (display->xdisplay,

@@ -55,6 +55,9 @@ struct _MetaX11Display
 #include <x11/atomnames.h>
 #undef item
 
+  int         xkb_base_event_type;
+  guint32     last_bell_time;
+
   int composite_event_base;
   int composite_error_base;
   int composite_major_version;

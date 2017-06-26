@@ -32,9 +32,14 @@
 
 #include "display-x11-private.h"
 
+#include "bell.h"
 #include "display-private.h"
 #include "frame.h"
 #include "util-private.h"
+
+#include "backends/x11/meta-backend-x11.h"
+
+#include <meta/meta-backend.h>
 
 #ifdef HAVE_RANDR
 #include <X11/extensions/Xrandr.h>
@@ -55,6 +60,11 @@
 #endif
 
 G_DEFINE_TYPE(MetaX11Display, meta_x11_display, G_TYPE_OBJECT);
+
+static void update_cursor_theme (void);
+
+static void prefs_changed_callback (MetaPreference pref,
+				    void          *data);
 
 static void
 meta_x11_display_class_init (MetaX11DisplayClass *klass)
@@ -138,6 +148,12 @@ meta_x11_display_open (MetaDisplay *display)
 #define item(x) display->atom_##x = atoms[i++];
 #include <x11/atomnames.h>
 #undef item
+
+  meta_bell_init (x11_display);
+
+  meta_prefs_add_listener (prefs_changed_callback, x11_display);
+
+  x11_display->last_bell_time = 0;
 
   {
     int major, minor;
@@ -300,6 +316,8 @@ meta_x11_display_open (MetaDisplay *display)
       meta_fatal ("X server doesn't have the XInput extension, version 2.2 or newer\n");
   }
 
+  update_cursor_theme ();
+
   return TRUE;
 }
 
@@ -310,6 +328,10 @@ meta_x11_display_close (MetaX11Display  *display,
   g_assert (display != NULL);
 
   display->display->x11_display = NULL;
+
+  meta_prefs_remove_listener (prefs_changed_callback, display);
+
+  meta_bell_shutdown (display);
 
   XFlush (display->xdisplay);
 
@@ -351,4 +373,51 @@ int
 meta_x11_display_get_shape_event_base (MetaX11Display *display)
 {
   return display->shape_event_base;
+}
+
+static void
+prefs_changed_callback (MetaPreference pref,
+                        void          *data)
+{
+  MetaX11Display *display = data;
+
+  if (pref == META_PREF_AUDIBLE_BELL)
+    {
+      meta_bell_set_audible (display, meta_prefs_bell_is_audible ());
+    }
+  else if (pref == META_PREF_CURSOR_THEME ||
+           pref == META_PREF_CURSOR_SIZE)
+    {
+      update_cursor_theme ();
+    }
+}
+
+static void
+set_cursor_theme (Display *xdisplay)
+{
+  XcursorSetTheme (xdisplay, meta_prefs_get_cursor_theme ());
+  XcursorSetDefaultSize (xdisplay, meta_prefs_get_cursor_size ());
+}
+
+static void
+update_cursor_theme (void)
+{
+  {
+    MetaDisplay *display = meta_get_display ();
+    MetaX11Display *x11_display = display->x11_display;
+
+    set_cursor_theme (x11_display->xdisplay);
+
+    if (display->screen)
+      meta_screen_update_cursor (display->screen);
+  }
+
+  {
+    MetaBackend *backend = meta_get_backend ();
+    if (META_IS_BACKEND_X11 (backend))
+      {
+        Display *xdisplay = meta_backend_x11_get_xdisplay (META_BACKEND_X11 (backend));
+        set_cursor_theme (xdisplay);
+      }
+  }
 }

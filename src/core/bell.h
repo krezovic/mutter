@@ -22,6 +22,8 @@
 #include "display-private.h"
 #include "frame.h"
 
+#include "x11/display-x11-private.h"
+
 /**
  * meta_bell_notify:
  * @display: The display the bell event came in on
@@ -44,7 +46,7 @@ gboolean meta_bell_notify (MetaDisplay *display,
  *
  * If the configure script found we had no XKB, this is a no-op.
  */
-void meta_bell_set_audible (MetaDisplay *display, gboolean audible);
+void meta_bell_set_audible (MetaX11Display *display, gboolean audible);
 
 /**
  * meta_bell_init:
@@ -62,7 +64,7 @@ void meta_bell_set_audible (MetaDisplay *display, gboolean audible);
  * that XFree86's implementation is broken so we shouldn't
  * call it, but that was in 2002. Is it working now?
  */
-gboolean meta_bell_init (MetaDisplay *display);
+gboolean meta_bell_init (MetaX11Display *display);
 
 /**
  * meta_bell_shutdown:
@@ -74,7 +76,7 @@ gboolean meta_bell_init (MetaDisplay *display);
  * enabled in meta_bell_init(), this wouldn't be a problem, but
  * we don't.
  */
-void meta_bell_shutdown (MetaDisplay *display);
+void meta_bell_shutdown (MetaX11Display *display);
 
 /**
  * meta_bell_notify_frame_destroy:

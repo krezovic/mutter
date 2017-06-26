@@ -231,9 +231,6 @@ struct _MetaDisplay
    * to avoid some race conditions on EnterNotify events
    */
   int         sentinel_counter;
-
-  int         xkb_base_event_type;
-  guint32     last_bell_time;
   int	      grab_resize_timeout_id;
 
   MetaKeyBindingManager key_binding_manager;

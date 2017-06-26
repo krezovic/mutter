@@ -157,11 +157,6 @@ static MetaDisplay *the_display = NULL;
 static const char *gnome_wm_keybindings = "Mutter";
 static const char *net_wm_name = "Mutter";
 
-static void update_cursor_theme (void);
-
-static void    prefs_changed_callback    (MetaPreference pref,
-                                          void          *data);
-
 static int mru_cmp (gconstpointer a,
                     gconstpointer b);
 
@@ -599,14 +594,6 @@ meta_display_open (void)
 
   display->closing = 0;
 
-  meta_x11_display_open (display);
-  g_assert (display->x11_display != NULL);
-
-  /* XXX: Transitional */
-  xdisplay = display->x11_display->xdisplay;
-  display->name = display->x11_display->name;
-  display->xdisplay = xdisplay;
-
   display->display_opening = TRUE;
 
   display->pending_pings = NULL;
@@ -621,11 +608,15 @@ meta_display_open (void)
   display->allow_terminal_deactivation = TRUE; /* Only relevant for when a
                                                   terminal has the focus */
 
-  meta_bell_init (display);
+  meta_x11_display_open (display);
+  g_assert (display->x11_display != NULL);
+
+  /* XXX: Transitional */
+  xdisplay = display->x11_display->xdisplay;
+  display->name = display->x11_display->name;
+  display->xdisplay = xdisplay;
 
   meta_display_init_keys (display);
-
-  meta_prefs_add_listener (prefs_changed_callback, display);
 
   display->prop_hooks = NULL;
   meta_display_init_window_prop_hooks (display);
@@ -665,8 +656,6 @@ meta_display_open (void)
   display->grab_resize_timeout_id = 0;
   display->grab_have_keyboard = FALSE;
 
-  display->last_bell_time = 0;
-
   display->grab_op = META_GRAB_OP_NONE;
   display->grab_window = NULL;
   display->grab_tile_mode = META_TILE_NONE;
@@ -693,8 +682,6 @@ meta_display_open (void)
     display->xinput_event_base = display->x11_display->xinput_event_base;
     display->have_xinput_23 = display->x11_display->have_xinput_23;
   }
-
-  update_cursor_theme ();
 
   /* Create the leader window here. Set its properties and
    * use the timestamp from one of the PropertyNotify events
@@ -943,8 +930,6 @@ meta_display_close (MetaDisplay *display,
     }
 
   display->closing += 1;
-
-  meta_prefs_remove_listener (prefs_changed_callback, display);
 
   meta_display_remove_autoraise_callback (display);
 
@@ -1959,34 +1944,6 @@ meta_display_retheme_all (void)
   meta_display_queue_retheme_all_windows (meta_get_display ());
 }
 
-static void
-set_cursor_theme (Display *xdisplay)
-{
-  XcursorSetTheme (xdisplay, meta_prefs_get_cursor_theme ());
-  XcursorSetDefaultSize (xdisplay, meta_prefs_get_cursor_size ());
-}
-
-static void
-update_cursor_theme (void)
-{
-  {
-    MetaDisplay *display = meta_get_display ();
-    set_cursor_theme (display->xdisplay);
-
-    if (display->screen)
-      meta_screen_update_cursor (display->screen);
-  }
-
-  {
-    MetaBackend *backend = meta_get_backend ();
-    if (META_IS_BACKEND_X11 (backend))
-      {
-        Display *xdisplay = meta_backend_x11_get_xdisplay (META_BACKEND_X11 (backend));
-        set_cursor_theme (xdisplay);
-      }
-  }
-}
-
 /*
  * Stores whether syncing is currently enabled.
  */
@@ -2559,23 +2516,6 @@ meta_display_sort_windows_by_stacking (MetaDisplay *display,
   copy = g_slist_sort (copy, meta_display_stack_cmp);
 
   return copy;
-}
-
-static void
-prefs_changed_callback (MetaPreference pref,
-                        void          *data)
-{
-  MetaDisplay *display = data;
-
-  if (pref == META_PREF_AUDIBLE_BELL)
-    {
-      meta_bell_set_audible (display, meta_prefs_bell_is_audible ());
-    }
-  else if (pref == META_PREF_CURSOR_THEME ||
-           pref == META_PREF_CURSOR_SIZE)
-    {
-      update_cursor_theme ();
-    }
 }
 
 void

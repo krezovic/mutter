@@ -1174,7 +1174,7 @@ notify_bell (MetaDisplay *display,
   if (!window && display->focus_window && display->focus_window->frame)
     window = display->focus_window;
 
-  display->last_bell_time = xkb_ev->time;
+  display->x11_display->last_bell_time = xkb_ev->time;
   if (!meta_bell_notify (display, window) &&
       meta_prefs_bell_is_audible ())
     {
@@ -1644,14 +1644,14 @@ handle_other_xevent (MetaDisplay *display,
       }
       break;
     default:
-      if (event->type == display->xkb_base_event_type)
+      if (event->type == display->x11_display->xkb_base_event_type)
         {
           XkbAnyEvent *xkb_ev = (XkbAnyEvent *) event;
 
           switch (xkb_ev->xkb_type)
             {
             case XkbBellNotify:
-              if (XSERVER_TIME_IS_BEFORE(display->last_bell_time,
+              if (XSERVER_TIME_IS_BEFORE(display->x11_display->last_bell_time,
                                          xkb_ev->time - 100))
                 {
                   notify_bell (display, xkb_ev);
