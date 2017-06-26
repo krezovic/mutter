@@ -982,7 +982,7 @@ meta_stack_tracker_lower_below (MetaStackTracker *tracker,
         {
           serial = XNextRequest (tracker->screen->display->xdisplay);
 
-          meta_error_trap_push (tracker->screen->display);
+          meta_error_trap_push ();
 
           changes.stack_mode = changes.sibling ? Below : Above;
 
@@ -991,7 +991,7 @@ meta_stack_tracker_lower_below (MetaStackTracker *tracker,
                             (changes.sibling ? CWSibling : 0) | CWStackMode,
                             &changes);
 
-          meta_error_trap_pop (tracker->screen->display);
+          meta_error_trap_pop ();
         }
     }
 
@@ -1016,7 +1016,7 @@ meta_stack_tracker_raise_above (MetaStackTracker *tracker,
         {
           serial = XNextRequest (tracker->screen->display->xdisplay);
 
-          meta_error_trap_push (tracker->screen->display);
+          meta_error_trap_push ();
 
           changes.stack_mode = changes.sibling ? Above : Below;
 
@@ -1025,7 +1025,7 @@ meta_stack_tracker_raise_above (MetaStackTracker *tracker,
                             (changes.sibling ? CWSibling : 0) | CWStackMode,
                             &changes);
 
-          meta_error_trap_pop (tracker->screen->display);
+          meta_error_trap_pop ();
         }
     }
 

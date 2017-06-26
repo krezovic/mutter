@@ -27,11 +27,10 @@
 #include <meta/util.h>
 #include <meta/display.h>
 
-void      meta_error_trap_push (MetaDisplay *display);
-void      meta_error_trap_pop  (MetaDisplay *display);
+void      meta_error_trap_push (void);
+void      meta_error_trap_pop  (void);
 
 /* returns X error code, or 0 for no error */
-int       meta_error_trap_pop_with_return  (MetaDisplay *display);
-
+int       meta_error_trap_pop_with_return  (void);
 
 #endif

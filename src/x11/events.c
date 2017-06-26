@@ -534,10 +534,10 @@ meta_spew_core_event (MetaDisplay *display,
 
         name = "PropertyNotify";
 
-        meta_error_trap_push (display);
+        meta_error_trap_push ();
         str = XGetAtomName (display->xdisplay,
                             event->xproperty.atom);
-        meta_error_trap_pop (display);
+        meta_error_trap_pop ();
 
         if (event->xproperty.state == PropertyNewValue)
           state = "PropertyNewValue";
@@ -568,10 +568,10 @@ meta_spew_core_event (MetaDisplay *display,
       {
         char *str;
         name = "ClientMessage";
-        meta_error_trap_push (display);
+        meta_error_trap_push ();
         str = XGetAtomName (display->xdisplay,
                             event->xclient.message_type);
-        meta_error_trap_pop (display);
+        meta_error_trap_pop ();
         extra = g_strdup_printf ("type: %s format: %d\n",
                                  str ? str : "(unknown atom)",
                                  event->xclient.format);
@@ -971,12 +971,12 @@ process_request_frame_extents (MetaDisplay    *display,
               "to top = %lu, left = %lu, bottom = %lu, right = %lu\n",
               xwindow, data[0], data[1], data[2], data[3]);
 
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
   XChangeProperty (display->xdisplay, xwindow,
                    display->atom__NET_FRAME_EXTENTS,
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 4);
-  meta_error_trap_pop (display);
+  meta_error_trap_pop ();
 
   meta_XFree (hints);
 }
@@ -998,7 +998,7 @@ convert_property (MetaDisplay *display,
   conversion_targets[2] = display->atom_TIMESTAMP;
   conversion_targets[3] = display->atom_VERSION;
 
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
   if (target == display->atom_TARGETS)
     XChangeProperty (display->xdisplay, w, property,
 		     XA_ATOM, 32, PropModeReplace,
@@ -1013,11 +1013,11 @@ convert_property (MetaDisplay *display,
 		     (unsigned char *)icccm_version, 2);
   else
     {
-      meta_error_trap_pop_with_return (display);
+      meta_error_trap_pop_with_return ();
       return FALSE;
     }
 
-  if (meta_error_trap_pop_with_return (display) != Success)
+  if (meta_error_trap_pop_with_return () != Success)
     return FALSE;
 
   /* Be sure the PropertyNotify has arrived so we
@@ -1043,10 +1043,10 @@ process_selection_request (MetaDisplay   *display,
     {
       char *str;
 
-      meta_error_trap_push (display);
+      meta_error_trap_push ();
       str = XGetAtomName (display->xdisplay,
                           event->xselectionrequest.selection);
-      meta_error_trap_pop (display);
+      meta_error_trap_pop ();
 
       meta_verbose ("Selection request with selection %s window 0x%lx not a WM_Sn selection we recognize\n",
                     str ? str : "(bad atom)", event->xselectionrequest.owner);
@@ -1073,18 +1073,18 @@ process_selection_request (MetaDisplay   *display,
           unsigned long num, rest;
           unsigned char *data;
 
-          meta_error_trap_push (display);
+          meta_error_trap_push ();
           if (XGetWindowProperty (display->xdisplay,
                                   event->xselectionrequest.requestor,
                                   event->xselectionrequest.property, 0, 256, False,
                                   display->atom_ATOM_PAIR,
                                   &type, &format, &num, &rest, &data) != Success)
             {
-              meta_error_trap_pop_with_return (display);
+              meta_error_trap_pop_with_return ();
               return;
             }
 
-          if (meta_error_trap_pop_with_return (display) == Success)
+          if (meta_error_trap_pop_with_return () == Success)
             {
               /* FIXME: to be 100% correct, should deal with rest > 0,
                * but since we have 4 possible targets, we will hardly ever
@@ -1101,13 +1101,13 @@ process_selection_request (MetaDisplay   *display,
                   i += 2;
                 }
 
-              meta_error_trap_push (display);
+              meta_error_trap_push ();
               XChangeProperty (display->xdisplay,
                                event->xselectionrequest.requestor,
                                event->xselectionrequest.property,
                                display->atom_ATOM_PAIR,
                                32, PropModeReplace, data, num);
-              meta_error_trap_pop (display);
+              meta_error_trap_pop ();
               meta_XFree (data);
             }
         }
@@ -1142,10 +1142,10 @@ process_selection_clear (MetaDisplay   *display,
     {
       char *str;
 
-      meta_error_trap_push (display);
+      meta_error_trap_push ();
       str = XGetAtomName (display->xdisplay,
                           event->xselectionclear.selection);
-      meta_error_trap_pop (display);
+      meta_error_trap_pop ();
 
       meta_verbose ("Selection clear with selection %s window 0x%lx not a WM_Sn selection we recognize\n",
                     str ? str : "(bad atom)", event->xselectionclear.window);
@@ -1306,9 +1306,9 @@ handle_other_xevent (MetaDisplay *display,
             {
               meta_warning ("Unexpected destruction of frame 0x%lx, not sure if this should silently fail or be considered a bug\n",
                             window->frame->xwindow);
-              meta_error_trap_push (display);
+              meta_error_trap_push ();
               meta_window_destroy_frame (window->frame->window);
-              meta_error_trap_pop (display);
+              meta_error_trap_pop ();
             }
           else
             {
@@ -1445,10 +1445,10 @@ handle_other_xevent (MetaDisplay *display,
 
           meta_verbose ("Configuring withdrawn window to %d,%d %dx%d border %d (some values may not be in mask)\n",
                         xwc.x, xwc.y, xwc.width, xwc.height, xwc.border_width);
-          meta_error_trap_push (display);
+          meta_error_trap_push ();
           XConfigureWindow (display->xdisplay, event->xconfigurerequest.window,
                             xwcm, &xwc);
-          meta_error_trap_pop (display);
+          meta_error_trap_pop ();
         }
       else
         {

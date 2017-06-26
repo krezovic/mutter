@@ -536,7 +536,7 @@ meta_input_settings_x11_set_tablet_mapping (MetaInputSettings     *settings,
     return;
 
   /* Grab the puke bucket! */
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
   xdev = XOpenDevice (xdisplay, device_id);
   if (xdev)
     {
@@ -546,7 +546,7 @@ meta_input_settings_x11_set_tablet_mapping (MetaInputSettings     *settings,
       XCloseDevice (xdisplay, xdev);
     }
 
-  if (meta_error_trap_pop_with_return (display))
+  if (meta_error_trap_pop_with_return ())
     {
       g_warning ("Could not set tablet mapping for %s",
                  clutter_input_device_get_device_name (device));
@@ -714,7 +714,7 @@ meta_input_settings_x11_set_stylus_button_map (MetaInputSettings          *setti
     return;
 
   /* Grab the puke bucket! */
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
   xdev = XOpenDevice (xdisplay, device_id);
   if (xdev)
     {
@@ -728,7 +728,7 @@ meta_input_settings_x11_set_stylus_button_map (MetaInputSettings          *setti
       XCloseDevice (xdisplay, xdev);
     }
 
-  if (meta_error_trap_pop_with_return (display))
+  if (meta_error_trap_pop_with_return ())
     {
       g_warning ("Could not set stylus button map for %s",
                  clutter_input_device_get_device_name (device));

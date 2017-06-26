@@ -571,11 +571,11 @@ set_title_text (MetaWindow  *window,
   /* Bug 330671 -- Don't forget to clear _NET_WM_VISIBLE_(ICON_)NAME */
   if (!modified && previous_was_modified)
     {
-      meta_error_trap_push (window->display);
+      meta_error_trap_push ();
       XDeleteProperty (window->display->xdisplay,
                        window->xwindow,
                        atom);
-      meta_error_trap_pop (window->display);
+      meta_error_trap_pop ();
     }
 
   return modified;

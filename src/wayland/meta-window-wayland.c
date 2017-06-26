@@ -559,7 +559,7 @@ meta_window_wayland_new (MetaDisplay        *display,
    * X requests (passing a window xid of None) until we thoroughly audit all
    * the code to make sure it knows about non X based clients...
    */
-  meta_error_trap_push (display); /* Push a trap over all of window
+  meta_error_trap_push (); /* Push a trap over all of window
                                    * creation, to reduce XSync() calls
                                    */
 
@@ -573,7 +573,7 @@ meta_window_wayland_new (MetaDisplay        *display,
                                     &attrs);
   window->can_ping = TRUE;
 
-  meta_error_trap_pop (display); /* pop the XSync()-reducing trap */
+  meta_error_trap_pop (); /* pop the XSync()-reducing trap */
 
   return window;
 }

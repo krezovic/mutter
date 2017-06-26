@@ -653,10 +653,10 @@ wayland_selection_data_free (WaylandSelectionData *data)
   /* Do *not* change the event mask on the root window, bugger! */
   if (!data->window && data->request_event.requestor != screen->xroot)
     {
-      meta_error_trap_push (display);
+      meta_error_trap_push ();
       XSelectInput (GDK_DISPLAY_XDISPLAY (gdk_display_get_default ()),
                     data->request_event.requestor, NoEventMask);
-      meta_error_trap_pop (display);
+      meta_error_trap_pop ();
     }
 
   g_cancellable_cancel (data->cancellable);

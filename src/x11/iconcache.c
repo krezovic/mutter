@@ -209,7 +209,7 @@ read_rgb_icon (MetaDisplay      *display,
   int mini_w, mini_h;
   gulong *data_as_long;
 
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
   type = None;
   data = NULL;
   result = XGetWindowProperty (display->xdisplay,
@@ -218,7 +218,7 @@ read_rgb_icon (MetaDisplay      *display,
 			       0, G_MAXLONG,
 			       False, XA_CARDINAL, &type, &format, &nitems,
 			       &bytes_after, &data);
-  err = meta_error_trap_pop_with_return (display);
+  err = meta_error_trap_pop_with_return ();
 
   if (err != Success ||
       result != Success)
@@ -339,7 +339,7 @@ try_pixmap_and_mask (MetaDisplay      *display,
   if (src_pixmap == None)
     return FALSE;
 
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
 
   get_pixmap_geometry (display, src_pixmap, &w, &h, &d);
   icon = surface_from_pixmap (xdisplay, src_pixmap, w, h);
@@ -352,7 +352,7 @@ try_pixmap_and_mask (MetaDisplay      *display,
         mask = surface_from_pixmap (xdisplay, src_mask, w, h);
     }
 
-  meta_error_trap_pop (display);
+  meta_error_trap_pop ();
 
   if (icon && mask)
     {
@@ -403,7 +403,7 @@ get_kwm_win_icon (MetaDisplay *display,
   *pixmap = None;
   *mask = None;
 
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
   icons = NULL;
   result = XGetWindowProperty (display->xdisplay, xwindow,
                                display->atom__KWM_WIN_ICON,
@@ -414,7 +414,7 @@ get_kwm_win_icon (MetaDisplay *display,
 			       &bytes_after, &data);
   icons = (Pixmap *)data;
 
-  err = meta_error_trap_pop_with_return (display);
+  err = meta_error_trap_pop_with_return ();
   if (err != Success ||
       result != Success)
     return;

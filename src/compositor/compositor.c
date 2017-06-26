@@ -462,11 +462,11 @@ redirect_windows (MetaScreen *screen)
    */
   while (TRUE)
     {
-      meta_error_trap_push (display);
+      meta_error_trap_push ();
       XCompositeRedirectSubwindows (xdisplay, xroot, CompositeRedirectManual);
       XSync (xdisplay, FALSE);
 
-      if (!meta_error_trap_pop_with_return (display))
+      if (!meta_error_trap_pop_with_return ())
         break;
 
       if (n_retries == max_retries)
@@ -652,14 +652,12 @@ void
 meta_compositor_add_window (MetaCompositor    *compositor,
                             MetaWindow        *window)
 {
-  MetaDisplay *display = compositor->display;
-
-  meta_error_trap_push (display);
+  meta_error_trap_push ();
 
   meta_window_actor_new (window);
   sync_actor_stacking (compositor);
 
-  meta_error_trap_pop (display);
+  meta_error_trap_pop ();
 }
 
 void

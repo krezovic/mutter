@@ -83,7 +83,7 @@ meta_window_ensure_frame (MetaWindow *window)
 
   meta_display_register_x_window (window->display, &frame->xwindow, window);
 
-  meta_error_trap_push (window->display);
+  meta_error_trap_push ();
   if (window->mapped)
     {
       window->mapped = FALSE; /* the reparent will unmap the window,
@@ -103,7 +103,7 @@ meta_window_ensure_frame (MetaWindow *window)
                    frame->child_x,
                    frame->child_y);
   /* FIXME handle this error */
-  meta_error_trap_pop (window->display);
+  meta_error_trap_pop ();
 
   /* stick frame to the window */
   window->frame = frame;
@@ -167,7 +167,7 @@ meta_window_destroy_frame (MetaWindow *window)
   /* Unparent the client window; it may be destroyed,
    * thus the error trap.
    */
-  meta_error_trap_push (window->display);
+  meta_error_trap_push ();
   if (window->mapped)
     {
       window->mapped = FALSE; /* Keep track of unmapping it, so we
@@ -190,7 +190,7 @@ meta_window_destroy_frame (MetaWindow *window)
                     */
                    window->frame->rect.x + borders.invisible.left,
                    window->frame->rect.y + borders.invisible.top);
-  meta_error_trap_pop (window->display);
+  meta_error_trap_pop ();
 
   meta_ui_frame_unmanage (frame->ui_frame);
 

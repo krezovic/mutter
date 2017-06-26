@@ -44,19 +44,19 @@
  */
 
 void
-meta_error_trap_push (MetaDisplay *display)
+meta_error_trap_push (void)
 {
   gdk_error_trap_push ();
 }
 
 void
-meta_error_trap_pop (MetaDisplay *display)
+meta_error_trap_pop (void)
 {
   gdk_error_trap_pop_ignored ();
 }
 
 int
-meta_error_trap_pop_with_return  (MetaDisplay *display)
+meta_error_trap_pop_with_return (void)
 {
   return gdk_error_trap_pop ();
 }
