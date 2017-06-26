@@ -32,6 +32,8 @@
                     StructureNotifyMask | SubstructureNotifyMask | \
                     ExposureMask | FocusChangeMask)
 
+#define XDISPLAY(x) (x->display->xdisplay)
+
 void
 meta_window_ensure_frame (MetaWindow *window)
 {
@@ -62,7 +64,7 @@ meta_window_ensure_frame (MetaWindow *window)
                 frame->rect.width, frame->rect.height);
 
   frame->ui_frame = meta_ui_create_frame (window->screen->ui,
-                                          window->display->xdisplay,
+                                          XDISPLAY(window),
                                           frame->window,
                                           window->xvisual,
                                           frame->rect.x,
@@ -78,7 +80,7 @@ meta_window_ensure_frame (MetaWindow *window)
 
   meta_verbose ("Frame for %s is 0x%lx\n", frame->window->desc, frame->xwindow);
   attrs.event_mask = EVENT_MASK;
-  XChangeWindowAttributes (window->display->xdisplay,
+  XChangeWindowAttributes (XDISPLAY(window),
 			   frame->xwindow, CWEventMask, &attrs);
 
   meta_display_register_x_window (window->display, &frame->xwindow, window);
@@ -96,8 +98,8 @@ meta_window_ensure_frame (MetaWindow *window)
 
   meta_stack_tracker_record_remove (window->screen->stack_tracker,
                                     window->xwindow,
-                                    XNextRequest (window->display->xdisplay));
-  XReparentWindow (window->display->xdisplay,
+                                    XNextRequest (XDISPLAY(window)));
+  XReparentWindow (XDISPLAY(window),
                    window->xwindow,
                    frame->xwindow,
                    frame->child_x,
@@ -125,7 +127,7 @@ meta_window_ensure_frame (MetaWindow *window)
         /* Since the backend selects for events on another connection,
          * make sure to sync the GTK+ connection to ensure that the
          * frame window has been created on the server at this point. */
-        XSync (window->display->xdisplay, False);
+        XSync (XDISPLAY(window), False);
 
         unsigned char mask_bits[XIMaskLen (XI_LASTEVENT)] = { 0 };
         XIEventMask mask = { XIAllMasterDevices, sizeof (mask_bits), mask_bits };
@@ -180,8 +182,8 @@ meta_window_destroy_frame (MetaWindow *window)
     }
   meta_stack_tracker_record_add (window->screen->stack_tracker,
                                  window->xwindow,
-                                 XNextRequest (window->display->xdisplay));
-  XReparentWindow (window->display->xdisplay,
+                                 XNextRequest (XDISPLAY(window)));
+  XReparentWindow (XDISPLAY(window),
                    window->xwindow,
                    window->screen->xroot,
                    /* Using anything other than client root window coordinates
@@ -374,13 +376,13 @@ meta_frame_set_screen_cursor (MetaFrame	*frame,
     return;
   frame->current_cursor = cursor;
   if (cursor == META_CURSOR_DEFAULT)
-    XUndefineCursor (frame->window->display->xdisplay, frame->xwindow);
+    XUndefineCursor (XDISPLAY(frame->window), frame->xwindow);
   else
     {
       xcursor = meta_display_create_x_cursor (frame->window->display, cursor);
-      XDefineCursor (frame->window->display->xdisplay, frame->xwindow, xcursor);
-      XFlush (frame->window->display->xdisplay);
-      XFreeCursor (frame->window->display->xdisplay, xcursor);
+      XDefineCursor (XDISPLAY(frame->window), frame->xwindow, xcursor);
+      XFlush (XDISPLAY(frame->window));
+      XFreeCursor (XDISPLAY(frame->window), xcursor);
     }
 }
 

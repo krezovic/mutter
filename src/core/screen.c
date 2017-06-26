@@ -61,6 +61,9 @@
 
 #include "backends/x11/meta-backend-x11.h"
 
+#define XDISPLAY(x) (x->display->xdisplay)
+#define XATOM(x, y) (x->display->y)
+
 static char* get_screen_name (MetaDisplay *display,
                               int          number);
 
@@ -281,8 +284,8 @@ set_wm_check_hint (MetaScreen *screen)
 
   data[0] = screen->display->leader_window;
 
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_SUPPORTING_WM_CHECK,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_SUPPORTING_WM_CHECK),
                    XA_WINDOW,
                    32, PropModeReplace, (guchar*) data, 1);
 
@@ -292,8 +295,8 @@ set_wm_check_hint (MetaScreen *screen)
 static void
 unset_wm_check_hint (MetaScreen *screen)
 {
-  XDeleteProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_SUPPORTING_WM_CHECK);
+  XDeleteProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_SUPPORTING_WM_CHECK));
 }
 
 static int
@@ -301,17 +304,17 @@ set_supported_hint (MetaScreen *screen)
 {
   Atom atoms[] = {
 #define EWMH_ATOMS_ONLY
-#define item(x)  screen->display->atom_##x,
+#define item(x)  XATOM(screen, atom_##x),
 #include <x11/atomnames.h>
 #undef item
 #undef EWMH_ATOMS_ONLY
 
-    screen->display->atom__GTK_FRAME_EXTENTS,
-    screen->display->atom__GTK_SHOW_WINDOW_MENU,
+    XATOM(screen, atom__GTK_FRAME_EXTENTS),
+    XATOM(screen, atom__GTK_SHOW_WINDOW_MENU),
   };
 
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_SUPPORTED,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_SUPPORTED),
                    XA_ATOM,
                    32, PropModeReplace,
                    (guchar*) atoms, G_N_ELEMENTS(atoms));
@@ -340,8 +343,8 @@ set_wm_icon_size_hint (MetaScreen *screen)
   vals[5] = 0;
 #undef LEGACY_ICON_SIZE
 
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom_WM_ICON_SIZE,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom_WM_ICON_SIZE),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) vals, N_VALS);
 
@@ -389,10 +392,10 @@ meta_screen_ensure_xinerama_indices (MetaScreen *screen)
 
   screen->has_xinerama_indices = TRUE;
 
-  if (!XineramaIsActive (screen->display->xdisplay))
+  if (!XineramaIsActive (XDISPLAY(screen)))
     return;
 
-  infos = XineramaQueryScreens (screen->display->xdisplay, &n_infos);
+  infos = XineramaQueryScreens (XDISPLAY(screen), &n_infos);
   if (n_infos <= 0 || infos == NULL)
     {
       meta_XFree (infos);
@@ -775,7 +778,7 @@ meta_screen_new (MetaDisplay *display,
   screen->keys_grabbed = FALSE;
   meta_screen_grab_keys (screen);
 
-  screen->ui = meta_ui_new (screen->display->xdisplay);
+  screen->ui = meta_ui_new (XDISPLAY(screen));
 
   screen->tile_preview_timeout_id = 0;
 
@@ -804,7 +807,7 @@ meta_screen_init_workspaces (MetaScreen *screen)
   /* Get current workspace */
   if (meta_prop_get_cardinal (screen->display,
                               screen->xroot,
-                              screen->display->atom__NET_CURRENT_DESKTOP,
+                              XATOM(screen, atom__NET_CURRENT_DESKTOP),
                               &current_workspace_index))
     meta_verbose ("Read existing _NET_CURRENT_DESKTOP = %d\n",
                   (int) current_workspace_index);
@@ -849,14 +852,14 @@ meta_screen_free (MetaScreen *screen,
   meta_stack_tracker_free (screen->stack_tracker);
 
   meta_error_trap_push ();
-  XSelectInput (screen->display->xdisplay, screen->xroot, 0);
+  XSelectInput (XDISPLAY(screen), screen->xroot, 0);
   if (meta_error_trap_pop_with_return () != Success)
     meta_warning ("Could not release screen %d on display \"%s\"\n",
                   meta_ui_get_screen_number (), screen->display->name);
 
   unset_wm_check_hint (screen);
 
-  XDestroyWindow (screen->display->xdisplay,
+  XDestroyWindow (XDISPLAY(screen),
                   screen->wm_sn_selection_window);
 
   if (screen->work_area_later != 0)
@@ -876,7 +879,7 @@ void
 meta_screen_create_guard_window (MetaScreen *screen)
 {
   if (screen->guard_window == None)
-    screen->guard_window = create_guard_window (screen->display->xdisplay, screen);
+    screen->guard_window = create_guard_window (XDISPLAY(screen), screen);
 }
 
 void
@@ -1015,8 +1018,8 @@ set_number_of_spaces_hint (MetaScreen *screen,
   meta_verbose ("Setting _NET_NUMBER_OF_DESKTOPS to %lu\n", data[0]);
 
   meta_error_trap_push ();
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_NUMBER_OF_DESKTOPS,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_NUMBER_OF_DESKTOPS),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
   meta_error_trap_pop ();
@@ -1036,8 +1039,8 @@ set_desktop_geometry_hint (MetaScreen *screen)
   meta_verbose ("Setting _NET_DESKTOP_GEOMETRY to %lu, %lu\n", data[0], data[1]);
 
   meta_error_trap_push ();
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_DESKTOP_GEOMETRY,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_DESKTOP_GEOMETRY),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 2);
   meta_error_trap_pop ();
@@ -1060,8 +1063,8 @@ set_desktop_viewport_hint (MetaScreen *screen)
   meta_verbose ("Setting _NET_DESKTOP_VIEWPORT to 0, 0\n");
 
   meta_error_trap_push ();
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_DESKTOP_VIEWPORT,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_DESKTOP_VIEWPORT),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 2);
   meta_error_trap_pop ();
@@ -1196,7 +1199,7 @@ update_num_workspaces (MetaScreen *screen,
       list = NULL;
 
       if (meta_prop_get_cardinal_list (screen->display, screen->xroot,
-                                       screen->display->atom__NET_NUMBER_OF_DESKTOPS,
+                                       XATOM(screen, atom__NET_NUMBER_OF_DESKTOPS),
                                        &list, &n_items))
         {
           new_num = list[0];
@@ -1658,7 +1661,7 @@ meta_screen_update_workspace_layout (MetaScreen *screen)
 
   if (meta_prop_get_cardinal_list (screen->display,
                                    screen->xroot,
-                                   screen->display->atom__NET_DESKTOP_LAYOUT,
+                                   XATOM(screen, atom__NET_DESKTOP_LAYOUT),
                                    &list, &n_items))
     {
       if (n_items == 3 || n_items == 4)
@@ -1806,10 +1809,10 @@ set_workspace_names (MetaScreen *screen)
     }
 
   meta_error_trap_push ();
-  XChangeProperty (screen->display->xdisplay,
+  XChangeProperty (XDISPLAY(screen),
                    screen->xroot,
-                   screen->display->atom__NET_DESKTOP_NAMES,
-		   screen->display->atom_UTF8_STRING,
+                   XATOM(screen, atom__NET_DESKTOP_NAMES),
+                   XATOM(screen, atom_UTF8_STRING),
                    8, PropModeReplace,
 		   (unsigned char *)flattened->str, flattened->len);
   meta_error_trap_pop ();
@@ -1832,7 +1835,7 @@ meta_screen_update_workspace_names (MetaScreen *screen)
   n_names = 0;
   if (!meta_prop_get_utf8_list (screen->display,
                                 screen->xroot,
-                                screen->display->atom__NET_DESKTOP_NAMES,
+                                XATOM(screen, atom__NET_DESKTOP_NAMES),
                                 &names, &n_names))
     {
       meta_verbose ("Failed to get workspace names from root window\n");
@@ -1904,8 +1907,8 @@ set_work_area_hint (MetaScreen *screen)
     }
 
   meta_error_trap_push ();
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-		   screen->display->atom__NET_WORKAREA,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+		   XATOM(screen, atom__NET_WORKAREA),
 		   XA_CARDINAL, 32, PropModeReplace,
 		   (guchar*) data, num_workspaces*4);
   g_free (data);
@@ -2276,7 +2279,7 @@ on_monitors_changed (MetaMonitorManager *manager,
       changes.width = screen->rect.width;
       changes.height = screen->rect.height;
 
-      XConfigureWindow(screen->display->xdisplay,
+      XConfigureWindow(XDISPLAY(screen),
                        screen->guard_window,
                        CWX | CWY | CWWidth | CWHeight,
                        &changes);
@@ -2305,8 +2308,8 @@ meta_screen_update_showing_desktop_hint (MetaScreen *screen)
   data[0] = screen->active_workspace->showing_desktop ? 1 : 0;
 
   meta_error_trap_push ();
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_SHOWING_DESKTOP,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_SHOWING_DESKTOP),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
   meta_error_trap_pop ();
@@ -2599,7 +2602,7 @@ meta_screen_set_cm_selection (MetaScreen *screen)
   timestamp = meta_display_get_current_time_roundtrip (screen->display);
   g_snprintf (selection, sizeof (selection), "_NET_WM_CM_S%d",
               meta_ui_get_screen_number ());
-  a = XInternAtom (screen->display->xdisplay, selection, False);
+  a = XInternAtom (XDISPLAY(screen), selection, False);
   screen->wm_cm_selection_window = take_manager_selection (screen->display, screen->xroot, a, timestamp, TRUE);
 }
 
@@ -2682,8 +2685,8 @@ meta_screen_set_active_workspace_hint (MetaScreen *screen)
   meta_verbose ("Setting _NET_CURRENT_DESKTOP to %lu\n", data[0]);
 
   meta_error_trap_push ();
-  XChangeProperty (screen->display->xdisplay, screen->xroot,
-                   screen->display->atom__NET_CURRENT_DESKTOP,
+  XChangeProperty (XDISPLAY(screen), screen->xroot,
+                   XATOM(screen, atom__NET_CURRENT_DESKTOP),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
   meta_error_trap_pop ();
