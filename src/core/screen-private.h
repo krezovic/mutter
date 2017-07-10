@@ -54,11 +54,7 @@ struct _MetaScreen
 
   guint tile_preview_timeout_id; // non-X11
 
-  MetaWorkspace *active_workspace; // non-X11
-
  // X11
-
-  GList *workspaces; // non-X11
 
    // X11
 
@@ -66,12 +62,6 @@ struct _MetaScreen
 
    // X11
   guint work_area_later; // non-X11
-
-  int rows_of_workspaces; // non-X11 or X11; ask!
-  int columns_of_workspaces; // non-X11 or X11; ask!
-  MetaScreenCorner starting_corner; // non-X11 or X11; ask!
-  guint vertical_workspaces : 1; // non-X11 or X11; ask!
-  guint workspace_layout_overridden : 1; // non-X11 or X11; ask!
 
   guint keys_grabbed : 1;
 
@@ -89,7 +79,6 @@ MetaScreen*   meta_screen_new                 (MetaDisplay                *displ
                                                guint32                     timestamp);
 void          meta_screen_free                (MetaScreen                 *screen,
                                                guint32                     timestamp);
-void          meta_screen_init_workspaces     (MetaScreen                 *screen);
 
 void          meta_screen_update_tile_preview          (MetaScreen    *screen,
                                                         gboolean       delay);
@@ -98,48 +87,10 @@ void          meta_screen_hide_tile_preview            (MetaScreen    *screen);
 MetaWindow*   meta_screen_get_mouse_window     (MetaScreen                 *screen,
                                                 MetaWindow                 *not_this_one);
 
-void          meta_screen_update_workspace_layout (MetaScreen             *screen);
-void          meta_screen_update_workspace_names  (MetaScreen             *screen);
 void          meta_screen_queue_workarea_recalc   (MetaScreen             *screen);
-
-typedef struct MetaWorkspaceLayout MetaWorkspaceLayout;
-
-struct MetaWorkspaceLayout
-{
-  int rows;
-  int cols;
-  int *grid;
-  int grid_area;
-  int current_row;
-  int current_col;
-};
-
-void meta_screen_calc_workspace_layout (MetaScreen          *screen,
-                                        int                  num_workspaces,
-                                        int                  current_space,
-                                        MetaWorkspaceLayout *layout);
-void meta_screen_free_workspace_layout (MetaWorkspaceLayout *layout);
-
-void     meta_screen_minimize_all_on_active_workspace_except (MetaScreen *screen,
-                                                              MetaWindow *keep);
-
-/* Show/hide the desktop (temporarily hide all windows) */
-void     meta_screen_show_desktop        (MetaScreen *screen,
-                                          guint32     timestamp);
-void     meta_screen_unshow_desktop      (MetaScreen *screen);
-
-/* Update whether the destkop is being shown for the current active_workspace */
-void     meta_screen_update_showing_desktop_hint          (MetaScreen *screen);
 
 gboolean meta_screen_apply_startup_properties (MetaScreen *screen,
                                                MetaWindow *window);
-
-void     meta_screen_workspace_switched (MetaScreen         *screen,
-                                         int                 from,
-                                         int                 to,
-                                         MetaMotionDirection direction);
-
-void meta_screen_set_active_workspace_hint (MetaScreen *screen);
 
 gboolean meta_screen_handle_xevent (MetaScreen *screen,
                                     XEvent     *xevent);

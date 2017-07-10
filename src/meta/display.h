@@ -60,6 +60,21 @@ typedef enum
   META_PAD_ACTION_STRIP,  /* Action is a strip */
 } MetaPadActionType;
 
+/**
+ * MetaDisplayCorner:
+ * @META_DISPLAY_TOPLEFT: top-left corner
+ * @META_DISPLAY_TOPRIGHT: top-right corner
+ * @META_DISPLAY_BOTTOMLEFT: bottom-left corner
+ * @META_DISPLAY_BOTTOMRIGHT: bottom-right corner
+ */
+typedef enum
+{
+  META_DISPLAY_TOPLEFT,
+  META_DISPLAY_TOPRIGHT,
+  META_DISPLAY_BOTTOMLEFT,
+  META_DISPLAY_BOTTOMRIGHT
+} MetaDisplayCorner;
+
 typedef struct _MetaDisplayClass MetaDisplayClass;
 
 #define META_TYPE_DISPLAY              (meta_display_get_type ())
@@ -194,6 +209,31 @@ void meta_display_get_size   (MetaDisplay *display,
 void meta_display_set_cursor (MetaDisplay *display,
 			      MetaCursor   cursor);
 
-void meta_display_manage_all_windows (MetaDisplay *display);
+void meta_display_manage_all_windows   (MetaDisplay *display);
+void meta_display_focus_default_window (MetaDisplay *display,
+                                        guint32      timestamp);
+
+MetaWorkspace *meta_display_get_workspace_by_index (MetaDisplay  *display,
+                                                    int           idx);
+
+MetaWorkspace *meta_display_append_new_workspace (MetaDisplay *display,
+                                                  gboolean     activate,
+                                                  guint32      timestamp);
+
+void meta_display_remove_workspace (MetaDisplay *display,
+                                    MetaWorkspace *workspace,
+                                    guint32 timestamp);
+
+MetaWorkspace *meta_display_get_active_workspace       (MetaDisplay *display);
+int            meta_display_get_active_workspace_index (MetaDisplay *display);
+
+GList         *meta_display_get_workspaces             (MetaDisplay *display);
+int            meta_display_get_n_workspaces           (MetaDisplay *display);
+
+void meta_display_override_workspace_layout (MetaDisplay      *display,
+                                             MetaDisplayCorner starting_corner,
+                                             gboolean          vertical_layout,
+                                             int               n_rows,
+                                             int               n_columns);
 
 #endif

@@ -233,6 +233,15 @@ struct _MetaDisplay
   MetaStackTracker *stack_tracker;
 
   guint check_fullscreen_later;
+
+  MetaWorkspace *active_workspace;
+  GList *workspaces;
+
+  int rows_of_workspaces;
+  int columns_of_workspaces;
+  MetaDisplayCorner starting_corner;
+  guint vertical_workspaces : 1;
+  guint workspace_layout_overridden : 1;
 };
 
 struct _MetaDisplayClass
@@ -242,6 +251,18 @@ struct _MetaDisplayClass
   void (*monitors_changed)  (MetaDisplay *);
   void (*restacked)         (MetaDisplay *);
   void (*workareas_changed) (MetaDisplay *);
+};
+
+typedef struct MetaWorkspaceLayout MetaWorkspaceLayout;
+
+struct MetaWorkspaceLayout
+{
+  int rows;
+  int cols;
+  int *grid;
+  int grid_area;
+  int current_row;
+  int current_col;
 };
 
 #define XSERVER_TIME_IS_BEFORE_ASSUMING_REAL_TIMESTAMPS(time1, time2) \
@@ -417,5 +438,27 @@ void meta_display_foreach_window (MetaDisplay          *display,
 
 void meta_display_queue_check_fullscreen (MetaDisplay *display);
 void meta_display_restacked              (MetaDisplay *display);
+
+void meta_display_minimize_all_on_active_workspace_except (MetaDisplay *display,
+                                                           MetaWindow *keep);
+
+void meta_display_init_workspaces (MetaDisplay *display);
+
+void meta_display_show_desktop   (MetaDisplay *display,
+			          guint32      timestamp);
+void meta_display_unshow_desktop (MetaDisplay *display);
+
+void meta_display_calc_workspace_layout (MetaDisplay          *display,
+                                         int                   num_workspaces,
+                                         int                   current_space,
+                                         MetaWorkspaceLayout  *layout);
+void meta_display_free_workspace_layout (MetaWorkspaceLayout *layout);
+
+void meta_display_update_workspace_layout (MetaDisplay *display);
+
+void meta_display_workspace_switched (MetaDisplay        *display,
+                                      int                 from,
+                                      int                 to,
+                                      MetaMotionDirection direction);
 
 #endif

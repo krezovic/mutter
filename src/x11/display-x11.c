@@ -36,6 +36,7 @@
 #include "display-private.h"
 #include "frame.h"
 #include "util-private.h"
+#include "workspace-private.h"
 
 #include "backends/meta-logical-monitor.h"
 #include "backends/x11/meta-backend-x11.h"
@@ -1306,4 +1307,94 @@ meta_x11_display_xinerama_index_to_logical_monitor (MetaX11Display *x11_display,
     }
 
   return NULL;
+}
+
+void
+meta_x11_display_update_showing_desktop_hint (MetaX11Display *x11_display)
+{
+  MetaDisplay *display = x11_display->display;
+  unsigned long data[1];
+
+  data[0] = display->active_workspace->showing_desktop ? 1 : 0;
+
+  meta_error_trap_push ();
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_SHOWING_DESKTOP,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 1);
+  meta_error_trap_pop ();
+}
+
+void
+meta_x11_display_update_workspace_names (MetaX11Display *x11_display)
+{
+  char **names;
+  int n_names;
+  int i;
+
+  /* this updates names in prefs when the root window property changes,
+   * iff the new property contents don't match what's already in prefs
+   */
+
+  names = NULL;
+  n_names = 0;
+  if (!meta_prop_get_utf8_list (x11_display,
+                                x11_display->xroot,
+                                x11_display->atom__NET_DESKTOP_NAMES,
+                                &names, &n_names))
+    {
+      meta_verbose ("Failed to get workspace names from root window\n");
+      return;
+    }
+
+  i = 0;
+  while (i < n_names)
+    {
+      meta_topic (META_DEBUG_PREFS,
+                  "Setting workspace %d name to \"%s\" due to _NET_DESKTOP_NAMES change\n",
+                  i, names[i] ? names[i] : "null");
+      meta_prefs_change_workspace_name (i, names[i]);
+
+      ++i;
+    }
+
+  g_strfreev (names);
+}
+
+void
+meta_x11_display_set_active_workspace_hint (MetaX11Display *x11_display)
+{
+  unsigned long data[1];
+
+  data[0] = meta_workspace_index (x11_display->display->active_workspace);
+
+  meta_verbose ("Setting _NET_CURRENT_DESKTOP to %lu\n", data[0]);
+
+  meta_error_trap_push ();
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_CURRENT_DESKTOP,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 1);
+  meta_error_trap_pop ();
+}
+
+void
+meta_x11_display_set_number_of_spaces_hint (MetaX11Display *x11_display,
+					    int             n_spaces)
+{
+  unsigned long data[1];
+
+  data[0] = n_spaces;
+
+  meta_verbose ("Setting _NET_NUMBER_OF_DESKTOPS to %lu\n", data[0]);
+
+  meta_error_trap_push ();
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_NUMBER_OF_DESKTOPS,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 1);
+  meta_error_trap_pop ();
 }
