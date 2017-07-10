@@ -144,7 +144,6 @@ struct _MetaDisplay
   guint focused_by_us : 1;
 
   /*< private-ish >*/
-  MetaScreen *screen;
   GHashTable *stamps;
   GHashTable *wayland_windows;
 
@@ -390,7 +389,6 @@ void meta_display_accelerator_activate (MetaDisplay     *display,
 gboolean meta_display_modifiers_accelerator_activate (MetaDisplay *display);
 
 void meta_display_set_input_focus_xwindow (MetaDisplay *display,
-                                           MetaScreen  *screen,
                                            Window       window,
                                            guint32      timestamp);
 

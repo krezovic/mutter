@@ -133,7 +133,6 @@ MetaWindow* meta_display_get_tab_current (MetaDisplay   *display,
                                           MetaWorkspace *workspace);
 
 gboolean meta_display_begin_grab_op (MetaDisplay *display,
-                                     MetaScreen  *screen,
                                      MetaWindow  *window,
                                      MetaGrabOp   op,
                                      gboolean     pointer_already_grabbed,
@@ -186,7 +185,6 @@ void meta_display_set_input_focus_window   (MetaDisplay *display,
  * same as meta_display_set_input_focus_window
  */
 void meta_display_focus_the_no_focus_window (MetaDisplay *display,
-                                             MetaScreen  *screen,
                                              guint32      timestamp);
 
 GSList *meta_display_sort_windows_by_stacking (MetaDisplay *display,
@@ -194,10 +192,6 @@ GSList *meta_display_sort_windows_by_stacking (MetaDisplay *display,
 
 void meta_display_add_ignored_crossing_serial (MetaDisplay  *display,
                                                unsigned long serial);
-
-void meta_display_unmanage_screen (MetaDisplay *display,
-                                   MetaScreen  *screen,
-                                   guint32      timestamp);
 
 void meta_display_clear_mouse_mode (MetaDisplay *display);
 
@@ -269,5 +263,7 @@ int meta_display_get_monitor_neighbor_index (MetaDisplay         *display,
 
 gboolean meta_display_get_monitor_in_fullscreen (MetaDisplay *display,
                                                  int          monitor);
+
+int meta_display_get_screen_number (MetaDisplay *display);
 
 #endif

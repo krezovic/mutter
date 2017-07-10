@@ -35,7 +35,6 @@
 #include "events.h"
 #include "util-private.h"
 #include <meta/main.h>
-#include "screen-private.h"
 #include "window-private.h"
 #include "frame.h"
 #include <meta/errors.h>
@@ -288,7 +287,7 @@ meta_display_class_init (MetaDisplayClass *klass)
                   0,
                   NULL, NULL, NULL,
                   G_TYPE_NONE, 3,
-                  META_TYPE_SCREEN,
+                  META_TYPE_DISPLAY,
                   META_TYPE_WINDOW,
                   META_TYPE_GRAB_OP);
 
@@ -299,7 +298,7 @@ meta_display_class_init (MetaDisplayClass *klass)
                   0,
                   NULL, NULL, NULL,
                   G_TYPE_NONE, 3,
-                  META_TYPE_SCREEN,
+                  META_TYPE_DISPLAY,
                   META_TYPE_WINDOW,
                   META_TYPE_GRAB_OP);
 
@@ -650,9 +649,6 @@ on_startup_notification_changed (MetaStartupNotification *sn,
                                  gpointer                 sequence,
                                  MetaDisplay             *display)
 {
-  if (!display->screen)
-    return;
-
   g_slist_free (display->startup_sequences);
   display->startup_sequences =
     meta_startup_notification_get_sequences (display->startup_notification);
@@ -685,7 +681,6 @@ gboolean
 meta_display_open (void)
 {
   MetaDisplay *display;
-  MetaScreen *screen;
   int i;
   guint32 timestamp;
   Window old_active_xwindow = None;
@@ -708,8 +703,6 @@ meta_display_open (void)
                                                   terminal has the focus */
 
   meta_display_init_keys (display);
-
-  display->screen = NULL;
 
   /* Get events */
   meta_display_init_events (display);
@@ -786,23 +779,6 @@ meta_display_open (void)
   display->keys_grabbed = FALSE;
   meta_display_grab_keys (display);
 
-  /* Mutter used to manage all X screens of the display in a single process, but
-   * now it always manages exactly one screen - the default screen retrieved
-   * from GDK.
-   */
-  screen = meta_screen_new (display, timestamp);
-
-  if (!screen)
-    {
-      /* This would typically happen because all the screens already
-       * have window managers.
-       */
-      meta_display_close (display, timestamp);
-      return FALSE;
-    }
-
-  display->screen = screen;
-
   if (!meta_is_wayland_compositor ())
     meta_prop_get_window (display->x11_display,
                           display->x11_display->xroot,
@@ -836,10 +812,10 @@ meta_display_open (void)
       if (old_active_window)
         meta_window_focus (old_active_window, timestamp);
       else
-        meta_display_focus_the_no_focus_window (display, display->screen, timestamp);
+        meta_display_focus_the_no_focus_window (display, timestamp);
     }
   else
-    meta_display_focus_the_no_focus_window (display, display->screen, timestamp);
+    meta_display_focus_the_no_focus_window (display, timestamp);
 
   meta_idle_monitor_init_dbus ();
 
@@ -999,10 +975,6 @@ meta_display_close (MetaDisplay *display,
   meta_display_unmanage_windows (display, timestamp);
 
   meta_display_ungrab_keys (display);
-
-  if (display->screen)
-    meta_screen_free (display->screen, timestamp);
-  display->screen = NULL;
 
   /* Must be after all calls to meta_window_unmanage() since they
    * unregister windows
@@ -1622,7 +1594,6 @@ get_event_route_from_grab_op (MetaGrabOp op)
 
 gboolean
 meta_display_begin_grab_op (MetaDisplay *display,
-			    MetaScreen  *screen,
                             MetaWindow  *window,
                             MetaGrabOp   op,
                             gboolean     pointer_already_grabbed,
@@ -1752,7 +1723,7 @@ meta_display_begin_grab_op (MetaDisplay *display,
     }
 
   g_signal_emit (display, display_signals[GRAB_OP_BEGIN], 0,
-                 screen, display->grab_window, display->grab_op);
+                 display, display->grab_window, display->grab_op);
 
   if (display->event_route == META_EVENT_ROUTE_WINDOW_OP)
     meta_window_grab_op_began (display->grab_window, display->grab_op);
@@ -1777,7 +1748,7 @@ meta_display_end_grab_op (MetaDisplay *display,
   g_assert (grab_window != NULL);
 
   g_signal_emit (display, display_signals[GRAB_OP_END], 0,
-                 display->screen, grab_window, grab_op);
+                 display, grab_window, grab_op);
 
   /* We need to reset this early, since the
    * meta_window_grab_op_ended callback relies on this being
@@ -2408,17 +2379,6 @@ meta_resize_gravity_from_grab_op (MetaGrabOp op)
     }
 
   return gravity;
-}
-
-void
-meta_display_unmanage_screen (MetaDisplay *display,
-                              MetaScreen  *screen,
-                              guint32      timestamp)
-{
-  meta_verbose ("Unmanaging screen %d on display %s\n",
-                meta_ui_get_screen_number (),
-                display->x11_display->name);
-  meta_display_close (display, timestamp);
 }
 
 void

@@ -45,7 +45,7 @@ struct _MetaBackgroundMonitor
 
 struct _MetaBackgroundPrivate
 {
-  MetaScreen *screen;
+  MetaDisplay *display;
   MetaBackgroundMonitor *monitors;
   int n_monitors;
 
@@ -69,7 +69,7 @@ struct _MetaBackgroundPrivate
 
 enum
 {
-  PROP_META_SCREEN = 1,
+  PROP_META_DISPLAY = 1,
   PROP_MONITOR,
 };
 
@@ -129,7 +129,7 @@ free_wallpaper_texture (MetaBackground *self)
 }
 
 static void
-on_monitors_changed (MetaScreen     *screen,
+on_monitors_changed (MetaDisplay    *display,
                      MetaBackground *self)
 {
   MetaBackgroundPrivate *priv = self->priv;
@@ -139,11 +139,11 @@ on_monitors_changed (MetaScreen     *screen,
   priv->monitors = NULL;
   priv->n_monitors = 0;
 
-  if (priv->screen)
+  if (priv->display)
     {
       int i;
 
-      priv->n_monitors = meta_display_get_n_monitors (meta_screen_get_display (screen));
+      priv->n_monitors = meta_display_get_n_monitors (display);
       priv->monitors = g_new0 (MetaBackgroundMonitor, priv->n_monitors);
 
       for (i = 0; i < priv->n_monitors; i++)
@@ -152,29 +152,29 @@ on_monitors_changed (MetaScreen     *screen,
 }
 
 static void
-set_screen (MetaBackground *self,
-            MetaScreen     *screen)
+set_display (MetaBackground *self,
+             MetaDisplay    *display)
 {
   MetaBackgroundPrivate *priv = self->priv;
 
-  if (priv->screen != NULL)
+  if (priv->display != NULL)
     {
-      g_signal_handlers_disconnect_by_func (priv->screen,
+      g_signal_handlers_disconnect_by_func (priv->display,
                                             (gpointer)on_monitors_changed,
                                             self);
     }
 
-  priv->screen = screen;
+  priv->display = display;
 
-  if (priv->screen != NULL)
+  if (priv->display != NULL)
     {
-      g_signal_connect (meta_screen_get_display (priv->screen),
+      g_signal_connect (display,
                         "monitors-changed",
                         G_CALLBACK (on_monitors_changed),
                         self);
     }
 
-  on_monitors_changed (priv->screen, self);
+  on_monitors_changed (priv->display, self);
 }
 
 static void
@@ -185,8 +185,8 @@ meta_background_set_property (GObject      *object,
 {
   switch (prop_id)
     {
-    case PROP_META_SCREEN:
-      set_screen (META_BACKGROUND (object), g_value_get_object (value));
+    case PROP_META_DISPLAY:
+      set_display (META_BACKGROUND (object), g_value_get_object (value));
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -204,8 +204,8 @@ meta_background_get_property (GObject      *object,
 
   switch (prop_id)
     {
-    case PROP_META_SCREEN:
-      g_value_set_object (value, priv->screen);
+    case PROP_META_DISPLAY:
+      g_value_set_object (value, priv->display);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -307,7 +307,7 @@ meta_background_dispose (GObject *object)
   set_file (self, &priv->file1, &priv->background_image1, NULL);
   set_file (self, &priv->file2, &priv->background_image2, NULL);
 
-  set_screen (self, NULL);
+  set_display (self, NULL);
 
   G_OBJECT_CLASS (meta_background_parent_class)->dispose (object);
 }
@@ -328,7 +328,7 @@ meta_background_constructed (GObject *object)
 
   G_OBJECT_CLASS (meta_background_parent_class)->constructed (object);
 
-  g_signal_connect_object (meta_screen_get_display (priv->screen), "gl-video-memory-purged",
+  g_signal_connect_object (priv->display, "gl-video-memory-purged",
                            G_CALLBACK (mark_changed), object, G_CONNECT_SWAPPED);
 }
 
@@ -354,14 +354,14 @@ meta_background_class_init (MetaBackgroundClass *klass)
                   NULL, NULL, NULL,
                   G_TYPE_NONE, 0);
 
-  param_spec = g_param_spec_object ("meta-screen",
-                                    "MetaScreen",
-                                    "MetaScreen",
-                                    META_TYPE_SCREEN,
+  param_spec = g_param_spec_object ("meta-display",
+                                    "MetaDisplay",
+                                    "MetaDisplay",
+                                    META_TYPE_DISPLAY,
                                     G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
 
   g_object_class_install_property (object_class,
-                                   PROP_META_SCREEN,
+                                   PROP_META_DISPLAY,
                                    param_spec);
 
 }
@@ -410,7 +410,7 @@ get_texture_area (MetaBackground          *self,
       set_texture_area_from_monitor_area (monitor_rect, texture_area);
       break;
     case G_DESKTOP_BACKGROUND_STYLE_WALLPAPER:
-      meta_display_get_size (meta_screen_get_display (priv->screen),
+      meta_display_get_size (priv->display,
                              &screen_width, &screen_height);
 
       /* Start off by centering a tile in the middle of the
@@ -480,7 +480,7 @@ get_texture_area (MetaBackground          *self,
         /* paint region is the union of all monitors, with the origin
          * of the region set to align with monitor associated with the background.
          */
-        meta_display_get_size (meta_screen_get_display (priv->screen),
+        meta_display_get_size (priv->display,
                                &screen_width, &screen_height);
 
         /* unclipped texture area is whole screen */
@@ -755,7 +755,7 @@ meta_background_get_texture (MetaBackground         *self,
 
   monitor = &priv->monitors[monitor_index];
 
-  meta_display_get_monitor_geometry (meta_screen_get_display (priv->screen),
+  meta_display_get_monitor_geometry (priv->display,
                                      monitor_index,
                                      &geometry);
   monitor_area.x = geometry.x;
@@ -886,10 +886,10 @@ meta_background_get_texture (MetaBackground         *self,
 }
 
 MetaBackground *
-meta_background_new  (MetaScreen *screen)
+meta_background_new (MetaDisplay *display)
 {
   return g_object_new (META_TYPE_BACKGROUND,
-                       "meta-screen", screen,
+                       "meta-display", display,
                        NULL);
 }
 

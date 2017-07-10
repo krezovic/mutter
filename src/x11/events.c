@@ -982,7 +982,6 @@ process_request_frame_extents (MetaX11Display *display,
 /* from fvwm2, Copyright Matthias Clasen, Dominik Vogt */
 static gboolean
 convert_property (MetaX11Display *display,
-                  MetaScreen     *screen,
                   Window          w,
                   Atom            target,
                   Atom            property)
@@ -1033,7 +1032,6 @@ static void
 process_selection_request (MetaX11Display *display,
                            XEvent         *event)
 {
-  MetaScreen *screen = display->display->screen;
   XSelectionEvent reply;
 
   if (display->wm_sn_selection_window != event->xselectionrequest.owner ||
@@ -1092,7 +1090,7 @@ process_selection_request (MetaX11Display *display,
               i = 0;
               while (i < (int) num)
                 {
-                  if (!convert_property (display, screen,
+                  if (!convert_property (display,
                                          event->xselectionrequest.requestor,
                                          adata[i], adata[i+1]))
                     adata[i+1] = None;
@@ -1115,7 +1113,7 @@ process_selection_request (MetaX11Display *display,
       if (event->xselectionrequest.property == None)
         event->xselectionrequest.property = event->xselectionrequest.target;
 
-      if (convert_property (display, screen,
+      if (convert_property (display,
                             event->xselectionrequest.requestor,
                             event->xselectionrequest.target,
                             event->xselectionrequest.property))
@@ -1133,8 +1131,6 @@ static gboolean
 process_selection_clear (MetaX11Display *display,
                          XEvent         *event)
 {
-  MetaScreen *screen = display->display->screen;
-
   if (display->wm_sn_selection_window != event->xselectionclear.window ||
       display->wm_sn_atom != event->xselectionclear.selection)
     {
@@ -1156,8 +1152,8 @@ process_selection_clear (MetaX11Display *display,
   meta_verbose ("Got selection clear for on display %s\n",
                 display->name);
 
-  meta_display_unmanage_screen (display->display, screen,
-                                event->xselectionclear.time);
+  meta_display_close (display->display, event->xselectionclear.time);
+
   return TRUE;
 }
 

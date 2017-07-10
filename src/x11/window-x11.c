@@ -787,7 +787,6 @@ meta_window_x11_focus (MetaWindow *window,
               if (window->display->focus_window != NULL &&
                   window->display->focus_window->unmanaging)
                 meta_display_focus_the_no_focus_window (window->display,
-                                                        window->screen,
                                                         timestamp);
             }
 
@@ -1450,7 +1449,7 @@ meta_window_x11_update_icon (MetaWindow       *window,
   MetaWindowX11 *window_x11 = META_WINDOW_X11 (window);
   MetaWindowX11Private *priv = meta_window_x11_get_instance_private (window_x11);
 
-  return meta_read_icons (window->screen,
+  return meta_read_icons (window->display->x11_display,
                           window->xwindow,
                           &priv->icon_cache,
                           priv->wm_hints_pixmap,
@@ -2211,7 +2210,7 @@ meta_window_x11_property_notify (MetaWindow *window,
 static int
 query_pressed_buttons (MetaWindow *window)
 {
-  MetaCursorTracker *tracker = meta_cursor_tracker_get_for_screen (window->screen);
+  MetaCursorTracker *tracker = meta_cursor_tracker_get_for_display (window->display);
   ClutterModifierType mods;
   int button = 0;
 
@@ -2575,7 +2574,6 @@ meta_window_x11_client_message (MetaWindow *window,
           meta_topic (META_DEBUG_WINDOW_OPS,
                       "Beginning move/resize with button = %d\n", button);
           meta_display_begin_grab_op (window->display,
-                                      window->screen,
                                       window,
                                       op,
                                       FALSE,
@@ -2836,7 +2834,6 @@ maybe_filter_xwindow (MetaX11Display    *display,
 
 static gboolean
 is_our_xwindow (MetaDisplay       *display,
-                MetaScreen        *screen,
                 Window             xwindow,
                 XWindowAttributes *attrs)
 {
@@ -2896,7 +2893,6 @@ meta_window_x11_new (MetaDisplay       *display,
                      gboolean           must_be_viewable,
                      MetaCompEffect     effect)
 {
-  MetaScreen *screen = display->screen;
   XWindowAttributes attrs;
   gulong existing_wm_state;
   MetaWindow *window = NULL;
@@ -2933,7 +2929,7 @@ meta_window_x11_new (MetaDisplay       *display,
       goto error;
     }
 
-  if (is_our_xwindow (display, screen, xwindow, &attrs))
+  if (is_our_xwindow (display, xwindow, &attrs))
     {
       meta_verbose ("Not managing our own windows\n");
       goto error;
@@ -3028,7 +3024,6 @@ meta_window_x11_new (MetaDisplay       *display,
     }
 
   window = _meta_window_shared_new (display,
-                                    screen,
                                     META_WINDOW_CLIENT_TYPE_X11,
                                     NULL,
                                     xwindow,

@@ -1115,7 +1115,6 @@ meta_x11_display_timestamp_too_old (MetaX11Display *display,
 
 static void
 request_xserver_input_focus_change (MetaX11Display *display,
-                                    MetaScreen     *screen,
                                     MetaWindow     *meta_window,
                                     Window          xwindow,
                                     guint32         timestamp)
@@ -1173,7 +1172,6 @@ meta_display_set_input_focus_window (MetaDisplay *display,
                                      guint32      timestamp)
 {
   request_xserver_input_focus_change (display->x11_display,
-                                      window->screen,
                                       window,
                                       focus_frame ? window->frame->xwindow : window->xwindow,
                                       timestamp);
@@ -1181,12 +1179,10 @@ meta_display_set_input_focus_window (MetaDisplay *display,
 
 void
 meta_display_set_input_focus_xwindow (MetaDisplay *display,
-                                      MetaScreen  *screen,
                                       Window       window,
                                       guint32      timestamp)
 {
   request_xserver_input_focus_change (display->x11_display,
-                                      screen,
                                       NULL,
                                       window,
                                       timestamp);
@@ -1194,11 +1190,9 @@ meta_display_set_input_focus_xwindow (MetaDisplay *display,
 
 void
 meta_display_focus_the_no_focus_window (MetaDisplay *display,
-                                        MetaScreen  *screen,
                                         guint32      timestamp)
 {
   request_xserver_input_focus_change (display->x11_display,
-                                      screen,
                                       NULL,
                                       display->x11_display->no_focus_window,
                                       timestamp);
@@ -1569,4 +1563,10 @@ meta_x11_display_handle_xevent (MetaX11Display *x11_display,
     return TRUE;
 
   return FALSE;
+}
+
+int
+meta_x11_display_get_screen_number (MetaX11Display *x11_display)
+{
+  return meta_ui_get_screen_number ();
 }

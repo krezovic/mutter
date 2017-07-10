@@ -251,9 +251,6 @@ libmutter_@LIBMUTTER_API_VERSION@_la_SOURCES =	\
 	core/place.h				\
 	core/prefs.c				\
 	meta/prefs.h				\
-	core/screen.c				\
-	core/screen-private.h			\
-	meta/screen.h				\
 	core/startup-notification.c		\
 	core/startup-notification-private.h	\
 	meta/types.h				\
@@ -457,7 +454,6 @@ libmutterinclude_headers =			\
 	meta/meta-window-actor.h		\
 	meta/meta-window-shape.h		\
 	meta/prefs.h				\
-	meta/screen.h				\
 	meta/theme.h				\
 	meta/types.h				\
 	meta/util.h				\
