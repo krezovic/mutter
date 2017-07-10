@@ -40,38 +40,4 @@ GType meta_screen_get_type (void);
 int meta_screen_get_screen_number (MetaScreen *screen);
 MetaDisplay *meta_screen_get_display (MetaScreen *screen);
 
-GSList *meta_screen_get_startup_sequences (MetaScreen *screen);
-
-/**
- * MetaScreenDirection:
- * @META_SCREEN_UP: up
- * @META_SCREEN_DOWN: down
- * @META_SCREEN_LEFT: left
- * @META_SCREEN_RIGHT: right
- */
-typedef enum
-{
-  META_SCREEN_UP,
-  META_SCREEN_DOWN,
-  META_SCREEN_LEFT,
-  META_SCREEN_RIGHT
-} MetaScreenDirection;
-
-int  meta_screen_get_n_monitors       (MetaScreen    *screen);
-int  meta_screen_get_primary_monitor  (MetaScreen    *screen);
-int  meta_screen_get_current_monitor  (MetaScreen    *screen);
-void meta_screen_get_monitor_geometry (MetaScreen    *screen,
-                                       int            monitor,
-                                       MetaRectangle *geometry);
-
-gboolean meta_screen_get_monitor_in_fullscreen (MetaScreen  *screen,
-                                                int          monitor);
-
-int meta_screen_get_monitor_index_for_rect (MetaScreen    *screen,
-                                            MetaRectangle *rect);
-
-int meta_screen_get_monitor_neighbor_index (MetaScreen *screen,
-                                            int         which_monitor,
-                                            MetaScreenDirection dir);
-
 #endif

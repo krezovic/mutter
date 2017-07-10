@@ -35,6 +35,7 @@
 #include "bell.h"
 #include "display-private.h"
 #include "frame.h"
+#include "meta-cursor-tracker-private.h"
 #include "util-private.h"
 #include "workspace-private.h"
 
@@ -279,6 +280,129 @@ meta_x11_display_init (MetaX11Display *disp)
 {
 }
 
+static int
+set_wm_check_hint (MetaX11Display *x11_display)
+{
+  unsigned long data[1];
+
+  g_return_val_if_fail (x11_display->leader_window != None, 0);
+
+  data[0] = x11_display->leader_window;
+
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_SUPPORTING_WM_CHECK,
+                   XA_WINDOW,
+                   32, PropModeReplace, (guchar*) data, 1);
+
+  return Success;
+}
+
+static void
+unset_wm_check_hint (MetaX11Display *x11_display)
+{
+  XDeleteProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_SUPPORTING_WM_CHECK);
+}
+
+static int
+set_supported_hint (MetaX11Display *x11_display)
+{
+  Atom atoms[] = {
+#define EWMH_ATOMS_ONLY
+#define item(x)  x11_display->atom_##x,
+#include <x11/atomnames.h>
+#undef item
+#undef EWMH_ATOMS_ONLY
+
+    x11_display->atom__GTK_FRAME_EXTENTS,
+    x11_display->atom__GTK_SHOW_WINDOW_MENU,
+  };
+
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_SUPPORTED,
+                   XA_ATOM,
+                   32, PropModeReplace,
+                   (guchar*) atoms, G_N_ELEMENTS(atoms));
+
+  return Success;
+}
+
+
+static int
+set_wm_icon_size_hint (MetaX11Display *x11_display)
+{
+#define N_VALS 6
+  gulong vals[N_VALS];
+
+  /* We've bumped the real icon size up to 96x96, but
+   * we really should not add these sorts of constraints
+   * on clients still using the legacy WM_HINTS interface.
+   */
+#define LEGACY_ICON_SIZE 32
+
+  /* min width, min height, max w, max h, width inc, height inc */
+  vals[0] = LEGACY_ICON_SIZE;
+  vals[1] = LEGACY_ICON_SIZE;
+  vals[2] = LEGACY_ICON_SIZE;
+  vals[3] = LEGACY_ICON_SIZE;
+  vals[4] = 0;
+  vals[5] = 0;
+#undef LEGACY_ICON_SIZE
+
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom_WM_ICON_SIZE,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) vals, N_VALS);
+
+  return Success;
+#undef N_VALS
+}
+
+static void
+set_desktop_geometry_hint (MetaX11Display *x11_display)
+{
+  unsigned long data[2];
+
+  data[0] = x11_display->display->rect.width;
+  data[1] = x11_display->display->rect.height;
+
+  meta_verbose ("Setting _NET_DESKTOP_GEOMETRY to %lu, %lu\n", data[0], data[1]);
+
+  meta_error_trap_push ();
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_DESKTOP_GEOMETRY,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 2);
+  meta_error_trap_pop ();
+}
+
+static void
+set_desktop_viewport_hint (MetaX11Display *x11_display)
+{
+  unsigned long data[2];
+
+  /*
+   * Mutter does not implement viewports, so this is a fixed 0,0
+   */
+  data[0] = 0;
+  data[1] = 0;
+
+  meta_verbose ("Setting _NET_DESKTOP_VIEWPORT to 0, 0\n");
+
+  meta_error_trap_push ();
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_DESKTOP_VIEWPORT,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 2);
+  meta_error_trap_pop ();
+}
+
 /**
  * meta_x11_display_open:
  *
@@ -300,6 +424,7 @@ meta_x11_display_open (MetaDisplay *display)
   Window new_wm_sn_owner;
   gboolean replace_current_wm;
   Atom wm_sn_atom;
+  Screen *xscreen;
 
   /* A list of all atom names, so that we can intern them in one go. */
   const char *atom_names[] = {
@@ -357,6 +482,9 @@ meta_x11_display_open (MetaDisplay *display)
 
   number = meta_ui_get_screen_number ();
 
+  meta_verbose ("Trying screen %d on display '%s'\n",
+                number, x11_display->name);
+
   xroot = RootWindow (xdisplay, number);
 
   /* FVWM checks for None here, I don't know if this
@@ -365,7 +493,7 @@ meta_x11_display_open (MetaDisplay *display)
   if (xroot == None)
     {
       meta_warning (_("Screen %d on display “%s” is invalid\n"),
-                    number, display->x11_display->name);
+                    number, x11_display->name);
       return FALSE;
     }
 
@@ -665,6 +793,10 @@ meta_x11_display_open (MetaDisplay *display)
   /* Select for cursor changes so the cursor tracker is up to date. */
   XFixesSelectCursorInput (xdisplay, xroot, XFixesDisplayCursorNotifyMask);
 
+  xscreen = ScreenOfDisplay (xdisplay, number);
+  x11_display->default_xvisual = DefaultVisualOfScreen (xscreen);
+  x11_display->default_depth = DefaultDepthOfScreen (xscreen);
+
   x11_display->wm_sn_selection_window = new_wm_sn_owner;
   x11_display->wm_sn_atom = wm_sn_atom;
   x11_display->wm_sn_timestamp = x11_display->timestamp;
@@ -682,8 +814,29 @@ meta_x11_display_open (MetaDisplay *display)
   if (!meta_is_wayland_compositor ())
     x11_display->composite_overlay_window = XCompositeGetOverlayWindow (xdisplay, xroot);
 
+  /* Now that we've gotten taken a reference count on the COW, we
+   * can close the helper that is holding on to it */
+  meta_restart_finish ();
+
+  set_wm_icon_size_hint (x11_display);
+
+  set_supported_hint (x11_display);
+
+  set_wm_check_hint (x11_display);
+
+  set_desktop_viewport_hint (x11_display);
+
+  set_desktop_geometry_hint (x11_display);
+
+  x11_display->ui = meta_ui_new (x11_display->xdisplay);
+
   g_signal_connect (display, "monitors-changed",
                     G_CALLBACK (on_monitors_changed), x11_display);
+
+  meta_verbose ("Added screen %d ('%s') root 0x%lx\n",
+                number,
+                x11_display->screen_name,
+                x11_display->xroot);
 
   return TRUE;
 }
@@ -695,6 +848,10 @@ meta_x11_display_close (MetaX11Display  *display,
   g_assert (display != NULL);
 
   display->display->x11_display = NULL;
+
+  meta_ui_free (display->ui);
+
+  unset_wm_check_hint (display);
 
   meta_prefs_remove_listener (prefs_changed_callback, display);
 
@@ -1170,6 +1327,8 @@ static void
 on_monitors_changed (MetaDisplay    *display,
                      MetaX11Display *x11_display)
 {
+  set_desktop_geometry_hint (x11_display);
+
   /* Resize the guard window to fill the screen again. */
   if (x11_display->guard_window != None)
     {
@@ -1397,4 +1556,17 @@ meta_x11_display_set_number_of_spaces_hint (MetaX11Display *x11_display,
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
   meta_error_trap_pop ();
+}
+
+gboolean
+meta_x11_display_handle_xevent (MetaX11Display *x11_display,
+                                XEvent         *xevent)
+{
+  MetaBackend *backend = meta_get_backend ();
+  MetaCursorTracker *cursor_tracker = meta_backend_get_cursor_tracker (backend);
+
+  if (meta_cursor_tracker_handle_xevent (cursor_tracker, xevent))
+    return TRUE;
+
+  return FALSE;
 }

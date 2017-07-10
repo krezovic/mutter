@@ -114,8 +114,8 @@ typedef struct
 
 void     meta_display_init_keys             (MetaDisplay *display);
 void     meta_display_shutdown_keys         (MetaDisplay *display);
-void     meta_screen_grab_keys              (MetaScreen  *screen);
-void     meta_screen_ungrab_keys            (MetaScreen  *screen);
+void     meta_display_grab_keys             (MetaDisplay *display);
+void     meta_display_ungrab_keys           (MetaDisplay *display);
 void     meta_window_grab_keys              (MetaWindow  *window);
 void     meta_window_ungrab_keys            (MetaWindow  *window);
 gboolean meta_window_grab_all_keys          (MetaWindow  *window,

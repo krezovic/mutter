@@ -837,7 +837,6 @@ handle_input_xevent (MetaX11Display *display,
   XIEnterEvent *enter_event = (XIEnterEvent *) input_event;
   Window modified;
   MetaWindow *window;
-  MetaScreen *screen = display->display->screen;
 
   if (input_event == NULL)
     return FALSE;
@@ -857,7 +856,7 @@ handle_input_xevent (MetaX11Display *display,
   window = modified != None ? meta_x11_display_lookup_x_window (display, modified) : NULL;
 
   /* If this is an event for a GTK+ widget, let GTK+ handle it. */
-  if (meta_ui_window_is_widget (screen->ui, modified))
+  if (meta_ui_window_is_widget (display->ui, modified))
     return FALSE;
 
   switch (input_event->evtype)
@@ -955,7 +954,7 @@ process_request_frame_extents (MetaX11Display *display,
       MetaFrameBorders borders;
 
       /* Return estimated frame extents for a normal window. */
-      meta_ui_theme_get_frame_borders (display->display->screen->ui,
+      meta_ui_theme_get_frame_borders (display->ui,
                                        META_FRAME_TYPE_NORMAL,
                                        0,
                                        &borders);
@@ -1745,7 +1744,7 @@ meta_display_handle_xevent (MetaX11Display *display,
 
   if (event->xany.window == display->xroot)
     {
-      if (meta_screen_handle_xevent (display->display->screen, event))
+      if (meta_x11_display_handle_xevent (display, event))
         {
           bypass_gtk = bypass_compositor = TRUE;
           goto out;

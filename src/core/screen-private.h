@@ -45,25 +45,6 @@ struct _MetaScreen
   GObject parent_instance;
 
   MetaDisplay *display;
-   // X11
-   // X11
-  int default_depth; // X11
-  Visual *default_xvisual; // X11
-     // non-X11
-  MetaUI *ui; // X11
-
-  guint tile_preview_timeout_id; // non-X11
-
- // X11
-
-   // X11
-
-  GSList *startup_sequences; // non-X11
-
-   // X11
-  guint work_area_later; // non-X11
-
-  guint keys_grabbed : 1;
 
   int closing;
 };
@@ -71,28 +52,10 @@ struct _MetaScreen
 struct _MetaScreenClass
 {
   GObjectClass parent_class;
-
-  void (*workareas_changed) (MetaScreen *);
 };
 
 MetaScreen*   meta_screen_new                 (MetaDisplay                *display,
                                                guint32                     timestamp);
 void          meta_screen_free                (MetaScreen                 *screen,
                                                guint32                     timestamp);
-
-void          meta_screen_update_tile_preview          (MetaScreen    *screen,
-                                                        gboolean       delay);
-void          meta_screen_hide_tile_preview            (MetaScreen    *screen);
-
-MetaWindow*   meta_screen_get_mouse_window     (MetaScreen                 *screen,
-                                                MetaWindow                 *not_this_one);
-
-void          meta_screen_queue_workarea_recalc   (MetaScreen             *screen);
-
-gboolean meta_screen_apply_startup_properties (MetaScreen *screen,
-                                               MetaWindow *window);
-
-gboolean meta_screen_handle_xevent (MetaScreen *screen,
-                                    XEvent     *xevent);
-
 #endif

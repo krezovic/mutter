@@ -765,7 +765,7 @@ meta_workspace_invalidate_work_area (MetaWorkspace *workspace)
 
   g_list_free (windows);
 
-  meta_screen_queue_workarea_recalc (workspace->display->screen);
+  meta_display_queue_workarea_recalc (workspace->display);
 }
 
 static MetaStrut *
@@ -1021,7 +1021,7 @@ meta_workspace_set_builtin_struts (MetaWorkspace *workspace,
         case META_SIDE_TOP:
           if (meta_monitor_manager_get_logical_monitor_neighbor (monitor_manager,
                                                                  logical_monitor,
-                                                                 META_SCREEN_UP))
+                                                                 META_DISPLAY_UP))
             continue;
 
           strut->rect.height += strut->rect.y;
@@ -1030,7 +1030,7 @@ meta_workspace_set_builtin_struts (MetaWorkspace *workspace,
         case META_SIDE_BOTTOM:
           if (meta_monitor_manager_get_logical_monitor_neighbor (monitor_manager,
                                                                  logical_monitor,
-                                                                 META_SCREEN_DOWN))
+                                                                 META_DISPLAY_DOWN))
             continue;
 
           strut->rect.height = display->rect.height - strut->rect.y;
@@ -1038,7 +1038,7 @@ meta_workspace_set_builtin_struts (MetaWorkspace *workspace,
         case META_SIDE_LEFT:
           if (meta_monitor_manager_get_logical_monitor_neighbor (monitor_manager,
                                                                  logical_monitor,
-                                                                 META_SCREEN_LEFT))
+                                                                 META_DISPLAY_LEFT))
             continue;
 
           strut->rect.width += strut->rect.x;
@@ -1047,7 +1047,7 @@ meta_workspace_set_builtin_struts (MetaWorkspace *workspace,
         case META_SIDE_RIGHT:
           if (meta_monitor_manager_get_logical_monitor_neighbor (monitor_manager,
                                                                  logical_monitor,
-                                                                 META_SCREEN_RIGHT))
+                                                                 META_DISPLAY_RIGHT))
             continue;
 
           strut->rect.width = display->rect.width - strut->rect.x;
@@ -1266,7 +1266,7 @@ meta_workspace_focus_default_window (MetaWorkspace *workspace,
   else
     {
       MetaWindow * window;
-      window = meta_screen_get_mouse_window (workspace->display->screen, not_this_one);
+      window = meta_display_get_mouse_window (workspace->display, not_this_one);
       if (window &&
           window->type != META_WINDOW_DOCK &&
           window->type != META_WINDOW_DESKTOP)

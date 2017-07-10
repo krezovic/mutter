@@ -26,6 +26,7 @@
 #include <meta/types.h>
 #include <meta/prefs.h>
 #include <meta/common.h>
+#include <meta/workspace.h>
 
 /**
  * MetaTabList:
@@ -76,6 +77,21 @@ typedef enum
 } MetaDisplayCorner;
 
 typedef struct _MetaDisplayClass MetaDisplayClass;
+
+/**
+ * MetaDisplayDirection:
+ * @META_DISPLAY_UP: up
+ * @META_DISPLAY_DOWN: down
+ * @META_DISPLAY_LEFT: left
+ * @META_DISPLAY_RIGHT: right
+ */
+typedef enum
+{
+  META_DISPLAY_UP,
+  META_DISPLAY_DOWN,
+  META_DISPLAY_LEFT,
+  META_DISPLAY_RIGHT
+} MetaDisplayDirection;
 
 #define META_TYPE_DISPLAY              (meta_display_get_type ())
 #define META_DISPLAY(object)           (G_TYPE_CHECK_INSTANCE_CAST ((object), META_TYPE_DISPLAY, MetaDisplay))
@@ -235,5 +251,23 @@ void meta_display_override_workspace_layout (MetaDisplay      *display,
                                              gboolean          vertical_layout,
                                              int               n_rows,
                                              int               n_columns);
+
+GSList *meta_display_get_startup_sequences (MetaDisplay *display);
+
+int  meta_display_get_current_monitor  (MetaDisplay *display);
+int  meta_display_get_n_monitors       (MetaDisplay *display);
+int  meta_display_get_primary_monitor  (MetaDisplay *display);
+void meta_display_get_monitor_geometry (MetaDisplay   *display,
+                                        int            monitor,
+                                        MetaRectangle *geometry);
+
+int meta_display_get_monitor_index_for_rect (MetaDisplay *display,
+                                             MetaRectangle *rect);
+int meta_display_get_monitor_neighbor_index (MetaDisplay         *display,
+                                             int                  which_monitor,
+					     MetaDisplayDirection direction);
+
+gboolean meta_display_get_monitor_in_fullscreen (MetaDisplay *display,
+                                                 int          monitor);
 
 #endif

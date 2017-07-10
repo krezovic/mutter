@@ -37,6 +37,7 @@
 
 #include "display-private.h"
 #include "meta-monitor-manager-private.h"
+#include "ui.h"
 
 #include <x11/display-x11.h>
 
@@ -104,6 +105,11 @@ struct _MetaX11Display
   guint32 wm_sn_timestamp;
 
   gboolean has_xinerama_indices;
+
+  int default_depth;
+  Visual *default_xvisual;
+
+  MetaUI *ui;
 
   GHashTable *xids;
 
@@ -224,5 +230,8 @@ void meta_x11_display_update_workspace_names      (MetaX11Display *x11_display);
 void meta_x11_display_set_active_workspace_hint   (MetaX11Display *x11_display);
 void meta_x11_display_set_number_of_spaces_hint   (MetaX11Display *x11_display,
 					           int             n_spaces);
+
+gboolean meta_x11_display_handle_xevent (MetaX11Display *x11_display,
+                                         XEvent         *xevent);
 
 #endif

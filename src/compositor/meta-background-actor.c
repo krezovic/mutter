@@ -186,7 +186,9 @@ get_preferred_size (MetaBackgroundActor *self,
   MetaBackgroundActorPrivate *priv = META_BACKGROUND_ACTOR (self)->priv;
   MetaRectangle monitor_geometry;
 
-  meta_screen_get_monitor_geometry (priv->screen, priv->monitor, &monitor_geometry);
+  meta_display_get_monitor_geometry (meta_screen_get_display (priv->screen),
+                                     priv->monitor,
+                                     &monitor_geometry);
 
   if (width != NULL)
     *width = monitor_geometry.width;

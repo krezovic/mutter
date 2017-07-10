@@ -698,7 +698,7 @@ ungrab_key_bindings (MetaDisplay *display)
 {
   GSList *windows, *l;
 
-  meta_screen_ungrab_keys (display->screen);
+  meta_display_ungrab_keys (display);
 
   windows = meta_display_list_windows (display, META_LIST_DEFAULT);
   for (l = windows; l; l = l->next)
@@ -715,7 +715,7 @@ grab_key_bindings (MetaDisplay *display)
 {
   GSList *windows, *l;
 
-  meta_screen_grab_keys (display->screen);
+  meta_display_grab_keys (display);
 
   windows = meta_display_list_windows (display, META_LIST_DEFAULT);
   for (l = windows; l; l = l->next)
@@ -1295,45 +1295,45 @@ change_binding_keygrabs (MetaKeyBindingManager *keys,
 }
 
 static void
-meta_screen_change_keygrabs (MetaScreen *screen,
-                             gboolean    grab)
+meta_display_change_keygrabs (MetaDisplay *display,
+                              gboolean     grab)
 {
-  MetaDisplay *display = screen->display;
+  MetaX11Display *x11_display = display->x11_display;
   MetaKeyBindingManager *keys = &display->key_binding_manager;
   int i;
 
   if (keys->overlay_resolved_key_combo.len != 0)
-    meta_change_keygrab (keys, display->x11_display->xroot, grab,
+    meta_change_keygrab (keys, x11_display->xroot, grab,
                          &keys->overlay_resolved_key_combo);
 
   for (i = 0; i < keys->n_iso_next_group_combos; i++)
-    meta_change_keygrab (keys, display->x11_display->xroot, grab,
+    meta_change_keygrab (keys, x11_display->xroot, grab,
                          &keys->iso_next_group_combo[i]);
 
-  change_binding_keygrabs (keys, display->x11_display->xroot,
+  change_binding_keygrabs (keys, x11_display->xroot,
                            FALSE, grab);
 }
 
 void
-meta_screen_grab_keys (MetaScreen *screen)
+meta_display_grab_keys (MetaDisplay *display)
 {
-  if (screen->keys_grabbed)
+  if (display->keys_grabbed)
     return;
 
-  meta_screen_change_keygrabs (screen, TRUE);
+  meta_display_change_keygrabs (display, TRUE);
 
-  screen->keys_grabbed = TRUE;
+  display->keys_grabbed = TRUE;
 }
 
 void
-meta_screen_ungrab_keys (MetaScreen  *screen)
+meta_display_ungrab_keys (MetaDisplay *display)
 {
-  if (!screen->keys_grabbed)
+  if (!display->keys_grabbed)
     return;
 
-  meta_screen_change_keygrabs (screen, FALSE);
+  meta_display_change_keygrabs (display, FALSE);
 
-  screen->keys_grabbed = FALSE;
+  display->keys_grabbed = FALSE;
 }
 
 static void
@@ -2038,7 +2038,7 @@ process_mouse_move_resize_grab (MetaDisplay     *display,
     {
       /* Hide the tiling preview if necessary */
       if (window->tile_mode != META_TILE_NONE)
-        meta_screen_hide_tile_preview (screen);
+        meta_display_hide_tile_preview (display);
 
       /* Restore the original tile mode */
       window->tile_mode = display->grab_tile_mode;
@@ -3941,28 +3941,28 @@ init_builtin_key_bindings (MetaDisplay *display)
                           common_keybindings,
                           META_KEY_BINDING_PER_WINDOW,
                           META_KEYBINDING_ACTION_MOVE_TO_MONITOR_LEFT,
-                          handle_move_to_monitor, META_SCREEN_LEFT);
+                          handle_move_to_monitor, META_DISPLAY_LEFT);
 
   add_builtin_keybinding (display,
                           "move-to-monitor-right",
                           common_keybindings,
                           META_KEY_BINDING_PER_WINDOW,
                           META_KEYBINDING_ACTION_MOVE_TO_MONITOR_RIGHT,
-                          handle_move_to_monitor, META_SCREEN_RIGHT);
+                          handle_move_to_monitor, META_DISPLAY_RIGHT);
 
   add_builtin_keybinding (display,
                           "move-to-monitor-down",
                           common_keybindings,
                           META_KEY_BINDING_PER_WINDOW,
                           META_KEYBINDING_ACTION_MOVE_TO_MONITOR_DOWN,
-                          handle_move_to_monitor, META_SCREEN_DOWN);
+                          handle_move_to_monitor, META_DISPLAY_DOWN);
 
   add_builtin_keybinding (display,
                           "move-to-monitor-up",
                           common_keybindings,
                           META_KEY_BINDING_PER_WINDOW,
                           META_KEYBINDING_ACTION_MOVE_TO_MONITOR_UP,
-                          handle_move_to_monitor, META_SCREEN_UP);
+                          handle_move_to_monitor, META_DISPLAY_UP);
 
   add_builtin_keybinding (display,
                           "raise-or-lower",

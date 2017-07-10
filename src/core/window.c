@@ -824,10 +824,10 @@ meta_window_main_monitor_changed (MetaWindow               *window,
   META_WINDOW_GET_CLASS (window)->main_monitor_changed (window, old);
 
   if (old)
-    g_signal_emit_by_name (window->screen, "window-left-monitor",
+    g_signal_emit_by_name (window->display, "window-left-monitor",
                            old->number, window);
   if (window->monitor)
-    g_signal_emit_by_name (window->screen, "window-entered-monitor",
+    g_signal_emit_by_name (window->display, "window-entered-monitor",
                            window->monitor->number, window);
 }
 
@@ -1089,7 +1089,7 @@ _meta_window_shared_new (MetaDisplay         *display,
   /* Apply any window attributes such as initial workspace
    * based on startup notification
    */
-  meta_screen_apply_startup_properties (window->screen, window);
+  meta_display_apply_startup_properties (window->display, window);
 
   /* Try to get a "launch timestamp" for the window.  If the window is
    * a transient, we'd like to be able to get a last-usage timestamp
@@ -2842,7 +2842,7 @@ meta_window_is_monitor_sized (MetaWindow *window)
       MetaRectangle window_rect, monitor_rect;
 
       meta_window_get_frame_rect (window, &window_rect);
-      meta_screen_get_monitor_geometry (window->screen, window->monitor->number, &monitor_rect);
+      meta_display_get_monitor_geometry (window->display, window->monitor->number, &monitor_rect);
 
       if (meta_rectangle_equal (&window_rect, &monitor_rect))
         return TRUE;
@@ -2903,7 +2903,7 @@ meta_window_tile (MetaWindow *window)
     directions = META_MAXIMIZE_VERTICAL;
 
   meta_window_maximize_internal (window, directions, NULL);
-  meta_screen_update_tile_preview (window->screen, FALSE);
+  meta_display_update_tile_preview (window->display, FALSE);
 
   meta_window_get_frame_rect (window, &old_frame_rect);
   meta_window_get_buffer_rect (window, &old_buffer_rect);
@@ -2939,7 +2939,7 @@ meta_window_can_tile_side_by_side (MetaWindow *window)
   if (!meta_window_can_tile_maximized (window))
     return FALSE;
 
-  monitor = meta_screen_get_current_monitor (window->screen);
+  monitor = meta_display_get_current_monitor (window->display);
   meta_window_get_work_area_for_monitor (window, monitor, &tile_area);
 
   /* Do not allow tiling in portrait orientation */
@@ -5799,8 +5799,8 @@ update_move (MetaWindow  *window,
    * trigger it unwittingly, e.g. when shaking loose the window or moving
    * it to another monitor.
    */
-  meta_screen_update_tile_preview (window->screen,
-                                   window->tile_mode != META_TILE_NONE);
+  meta_display_update_tile_preview (window->display,
+                                    window->tile_mode != META_TILE_NONE);
 
   meta_window_get_frame_rect (window, &old);
 

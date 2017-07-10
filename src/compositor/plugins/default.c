@@ -328,7 +328,7 @@ on_monitors_changed (MetaScreen *screen,
 
   clutter_actor_destroy_all_children (self->priv->background_group);
 
-  n = meta_screen_get_n_monitors (screen);
+  n = meta_display_get_n_monitors (meta_screen_get_display (screen));
   for (i = 0; i < n; i++)
     {
       MetaRectangle rect;
@@ -336,7 +336,7 @@ on_monitors_changed (MetaScreen *screen,
       MetaBackground *background;
       ClutterColor color;
 
-      meta_screen_get_monitor_geometry (screen, i, &rect);
+      meta_display_get_monitor_geometry (meta_screen_get_display (screen), i, &rect);
 
       background_actor = meta_background_actor_new (screen, i);
 

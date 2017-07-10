@@ -233,6 +233,11 @@ struct _MetaDisplay
   MetaStackTracker *stack_tracker;
 
   guint check_fullscreen_later;
+  guint work_area_later;
+
+  guint tile_preview_timeout_id;
+
+  GSList *startup_sequences;
 
   MetaWorkspace *active_workspace;
   GList *workspaces;
@@ -242,6 +247,8 @@ struct _MetaDisplay
   MetaDisplayCorner starting_corner;
   guint vertical_workspaces : 1;
   guint workspace_layout_overridden : 1;
+
+  guint keys_grabbed : 1;
 };
 
 struct _MetaDisplayClass
@@ -284,9 +291,8 @@ gboolean      meta_display_open                (void);
 void          meta_display_close               (MetaDisplay *display,
                                                 guint32      timestamp);
 
-void          meta_display_unmanage_windows_for_screen (MetaDisplay *display,
-                                                        MetaScreen  *screen,
-                                                        guint32      timestamp);
+void          meta_display_unmanage_windows (MetaDisplay *display,
+                                             guint32      timestamp);
 
 /* Utility function to compare the stacking of two windows */
 int           meta_display_stack_cmp           (const void *a,
@@ -460,5 +466,17 @@ void meta_display_workspace_switched (MetaDisplay        *display,
                                       int                 from,
                                       int                 to,
                                       MetaMotionDirection direction);
+
+void meta_display_queue_workarea_recalc (MetaDisplay *display);
+
+gboolean meta_display_apply_startup_properties (MetaDisplay *display,
+                                                MetaWindow  *window);
+
+void meta_display_update_tile_preview (MetaDisplay *display,
+                                       gboolean     delay);
+void meta_display_hide_tile_preview   (MetaDisplay *display);
+
+MetaWindow *meta_display_get_mouse_window (MetaDisplay  *display,
+			                   MetaWindow   *not_this_one);
 
 #endif
