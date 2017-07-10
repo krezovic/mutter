@@ -563,7 +563,7 @@ wayland_selection_data_new (XSelectionRequestEvent *request_event,
                             MetaWaylandCompositor  *compositor)
 {
   MetaDisplay *display = meta_get_display ();
-  MetaScreen *screen = display->screen;
+  MetaX11Display *x11_display = display->x11_display;
   MetaWaylandDataDevice *data_device;
   MetaWaylandDataSource *wayland_source;
   MetaSelectionBridge *selection;
@@ -614,7 +614,7 @@ wayland_selection_data_new (XSelectionRequestEvent *request_event,
                                                    data->request_event.requestor);
 
   /* Do *not* change the event mask on the root window, bugger! */
-  if (!data->window && data->request_event.requestor != screen->xroot)
+  if (!data->window && data->request_event.requestor != x11_display->xroot)
     {
       /* Not a managed window, set the PropertyChangeMask
        * for INCR deletion notifications.
@@ -649,10 +649,10 @@ static void
 wayland_selection_data_free (WaylandSelectionData *data)
 {
   MetaDisplay *display = meta_get_display ();
-  MetaScreen *screen = display->screen;
+  MetaX11Display *x11_display = display->x11_display;
 
   /* Do *not* change the event mask on the root window, bugger! */
-  if (!data->window && data->request_event.requestor != screen->xroot)
+  if (!data->window && data->request_event.requestor != x11_display->xroot)
     {
       meta_error_trap_push ();
       XSelectInput (GDK_DISPLAY_XDISPLAY (gdk_display_get_default ()),

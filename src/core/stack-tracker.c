@@ -484,7 +484,7 @@ query_xserver_stack (MetaStackTracker *tracker)
   tracker->xserver_serial = XNextRequest (screen->display->x11_display->xdisplay);
 
   XQueryTree (screen->display->x11_display->xdisplay,
-              screen->xroot,
+              screen->display->x11_display->xroot,
               &ignored1, &ignored2, &children, &n_children);
 
   tracker->verified_stack = g_array_sized_new (FALSE, FALSE, sizeof (guint64), n_children);

@@ -66,6 +66,7 @@ meta_window_release_saved_state (const MetaWindowSessionInfo *info)
 #include <meta/main.h>
 #include <meta/util.h>
 #include "display-private.h"
+#include "x11/display-x11-private.h"
 #include <meta/workspace.h>
 
 static void ice_io_error_handler (IceConn connection);
@@ -1816,7 +1817,7 @@ warn_about_lame_clients_and_finish_interact (gboolean shutdown)
                            "and will have to be restarted manually next time "
                            "you log in."),
                          "240",
-                         meta_get_display()->screen->screen_name,
+                         meta_get_display()->x11_display->screen_name,
                          NULL, NULL, NULL,
                          None,
                          columns,

@@ -48,46 +48,39 @@ struct _MetaScreen
   GObject parent_instance;
 
   MetaDisplay *display;
-  char *screen_name;
-  Window xroot;
-  int default_depth;
-  Visual *default_xvisual;
-  MetaRectangle rect;  /* Size of screen; rect.x & rect.y are always 0 */
-  MetaUI *ui;
+   // X11
+   // X11
+  int default_depth; // X11
+  Visual *default_xvisual; // X11
+  MetaRectangle rect;  /* Size of screen; rect.x & rect.y are always 0 */ // non-X11
+  MetaUI *ui; // X11
 
-  guint tile_preview_timeout_id;
+  guint tile_preview_timeout_id; // non-X11
 
-  MetaWorkspace *active_workspace;
+  MetaWorkspace *active_workspace; // non-X11
 
-  /* This window holds the focus when we don't want to focus
-   * any actual clients
-   */
-  Window no_focus_window;
+ // X11
 
-  GList *workspaces;
+  GList *workspaces; // non-X11
 
-  MetaStack *stack;
-  MetaStackTracker *stack_tracker;
+  MetaStack *stack; // non-X11
+  MetaStackTracker *stack_tracker; // non-X11
 
-  MetaCursor current_cursor;
+  MetaCursor current_cursor; // non-X11
 
-  Window wm_sn_selection_window;
-  Atom wm_sn_atom;
-  guint32 wm_sn_timestamp;
+  gboolean has_xinerama_indices; // X11
 
-  gboolean has_xinerama_indices;
+  GSList *startup_sequences; // non-X11
 
-  GSList *startup_sequences;
+   // X11
+  guint work_area_later; // non-X11
+  guint check_fullscreen_later; // non-X11
 
-  Window wm_cm_selection_window;
-  guint work_area_later;
-  guint check_fullscreen_later;
-
-  int rows_of_workspaces;
-  int columns_of_workspaces;
-  MetaScreenCorner starting_corner;
-  guint vertical_workspaces : 1;
-  guint workspace_layout_overridden : 1;
+  int rows_of_workspaces; // non-X11 or X11; ask!
+  int columns_of_workspaces; // non-X11 or X11; ask!
+  MetaScreenCorner starting_corner; // non-X11 or X11; ask!
+  guint vertical_workspaces : 1; // non-X11 or X11; ask!
+  guint workspace_layout_overridden : 1; // non-X11 or X11; ask!
 
   guint keys_grabbed : 1;
 
@@ -97,8 +90,6 @@ struct _MetaScreen
    * and restack them below a guard window. When using a compositor
    * this allows us to provide live previews of unmapped windows */
   Window guard_window;
-
-  Window composite_overlay_window;
 };
 
 struct _MetaScreenClass
@@ -134,11 +125,6 @@ void          meta_screen_update_workspace_layout (MetaScreen             *scree
 void          meta_screen_update_workspace_names  (MetaScreen             *screen);
 void          meta_screen_queue_workarea_recalc   (MetaScreen             *screen);
 void          meta_screen_queue_check_fullscreen  (MetaScreen             *screen);
-
-
-Window meta_create_offscreen_window (Display *xdisplay,
-                                     Window   parent,
-                                     long     valuemask);
 
 typedef struct MetaWorkspaceLayout MetaWorkspaceLayout;
 

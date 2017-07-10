@@ -76,6 +76,84 @@ static void update_cursor_theme (void);
 static void prefs_changed_callback (MetaPreference pref,
 				    void          *data);
 
+static char* get_screen_name (Display *xdisplay,
+                              int      number);
+
+static Window
+take_manager_selection (MetaX11Display *x11_display,
+                        Window          xroot,
+                        Atom            manager_atom,
+                        int             timestamp,
+                        gboolean        should_replace)
+{
+  Display *xdisplay = x11_display->xdisplay;
+  Window current_owner, new_owner;
+
+  current_owner = XGetSelectionOwner (xdisplay, manager_atom);
+  if (current_owner != None)
+    {
+      XSetWindowAttributes attrs;
+
+      if (should_replace)
+        {
+          /* We want to find out when the current selection owner dies */
+          meta_error_trap_push ();
+          attrs.event_mask = StructureNotifyMask;
+          XChangeWindowAttributes (xdisplay, current_owner, CWEventMask, &attrs);
+          if (meta_error_trap_pop_with_return () != Success)
+            current_owner = None; /* don't wait for it to die later on */
+        }
+      else
+        {
+          meta_warning (_("Display “%s” already has a window manager; try using the --replace option to replace the current window manager."),
+                        x11_display->name);
+          return None;
+        }
+    }
+
+  /* We need SelectionClear and SelectionRequest events on the new owner,
+   * but those cannot be masked, so we only need NoEventMask.
+   */
+  new_owner = meta_create_offscreen_window (xdisplay, xroot, NoEventMask);
+
+  XSetSelectionOwner (xdisplay, manager_atom, new_owner, timestamp);
+
+  if (XGetSelectionOwner (xdisplay, manager_atom) != new_owner)
+    {
+      meta_warning ("Could not acquire selection: %s", XGetAtomName (xdisplay, manager_atom));
+      return None;
+    }
+
+  {
+    /* Send client message indicating that we are now the selection owner */
+    XClientMessageEvent ev;
+
+    ev.type = ClientMessage;
+    ev.window = xroot;
+    ev.message_type = x11_display->atom_MANAGER;
+    ev.format = 32;
+    ev.data.l[0] = timestamp;
+    ev.data.l[1] = manager_atom;
+
+    XSendEvent (xdisplay, xroot, False, StructureNotifyMask, (XEvent *) &ev);
+  }
+
+  /* Wait for old window manager to go away */
+  if (current_owner != None)
+    {
+      XEvent event;
+
+      /* We sort of block infinitely here which is probably lame. */
+
+      meta_verbose ("Waiting for old window manager to exit\n");
+      do
+        XWindowEvent (xdisplay, current_owner, StructureNotifyMask, &event);
+      while (event.type != DestroyNotify);
+    }
+
+  return new_owner;
+}
+
 /**
  * meta_set_wm_name: (skip)
  * @wm_name: value for _NET_WM_NAME
@@ -130,8 +208,13 @@ gboolean
 meta_x11_display_open (MetaDisplay *display)
 {
   MetaX11Display *x11_display;
+  Window xroot;
   Display *xdisplay;
-  int i;
+  int i, number;
+  char buf[128];
+  Window new_wm_sn_owner;
+  gboolean replace_current_wm;
+  Atom wm_sn_atom;
 
   /* A list of all atom names, so that we can intern them in one go. */
   const char *atom_names[] = {
@@ -186,6 +269,23 @@ meta_x11_display_open (MetaDisplay *display)
 #define item(x) x11_display->atom_##x = atoms[i++];
 #include <x11/atomnames.h>
 #undef item
+
+  number = meta_ui_get_screen_number ();
+
+  xroot = RootWindow (xdisplay, number);
+
+  /* FVWM checks for None here, I don't know if this
+   * ever actually happens
+   */
+  if (xroot == None)
+    {
+      meta_warning (_("Screen %d on display “%s” is invalid\n"),
+                    number, display->x11_display->name);
+      return FALSE;
+    }
+
+  x11_display->screen_name = get_screen_name (xdisplay, number);
+  x11_display->xroot = xroot;
 
   meta_bell_init (x11_display);
 
@@ -439,6 +539,62 @@ meta_x11_display_open (MetaDisplay *display)
 
   x11_display->last_focus_time = x11_display->timestamp;
 
+  replace_current_wm = meta_get_replace_current_wm ();
+
+  sprintf (buf, "WM_S%d", number);
+
+  wm_sn_atom = XInternAtom (xdisplay, buf, False);
+  new_wm_sn_owner = take_manager_selection (x11_display,
+                                            xroot,
+                                            wm_sn_atom,
+                                            x11_display->timestamp,
+                                            replace_current_wm);
+  if (new_wm_sn_owner == None)
+    return FALSE;
+
+  {
+    long event_mask;
+    unsigned char mask_bits[XIMaskLen (XI_LASTEVENT)] = { 0 };
+    XIEventMask mask = { XIAllMasterDevices, sizeof (mask_bits), mask_bits };
+
+    XISetMask (mask.mask, XI_Enter);
+    XISetMask (mask.mask, XI_Leave);
+    XISetMask (mask.mask, XI_FocusIn);
+    XISetMask (mask.mask, XI_FocusOut);
+#ifdef HAVE_XI23
+    if (META_X11_DISPLAY_HAS_XINPUT_23 (x11_display))
+      {
+        XISetMask (mask.mask, XI_BarrierHit);
+        XISetMask (mask.mask, XI_BarrierLeave);
+      }
+#endif /* HAVE_XI23 */
+    XISelectEvents (xdisplay, xroot, &mask, 1);
+
+    event_mask = (SubstructureRedirectMask | SubstructureNotifyMask |
+                  StructureNotifyMask | ColormapChangeMask | PropertyChangeMask);
+    XSelectInput (xdisplay, xroot, event_mask);
+  }
+
+  /* Select for cursor changes so the cursor tracker is up to date. */
+  XFixesSelectCursorInput (xdisplay, xroot, XFixesDisplayCursorNotifyMask);
+
+  x11_display->wm_sn_selection_window = new_wm_sn_owner;
+  x11_display->wm_sn_atom = wm_sn_atom;
+  x11_display->wm_sn_timestamp = x11_display->timestamp;
+
+  /* Handle creating a no_focus_window for this screen */
+  x11_display->no_focus_window =
+    meta_create_offscreen_window (xdisplay,
+                                  xroot,
+                                  FocusChangeMask|KeyPressMask|KeyReleaseMask);
+  XMapWindow (xdisplay, x11_display->no_focus_window);
+  /* Done with no_focus_window stuff */
+
+  /* If we're a Wayland compositor, then we don't grab the COW, since it
+   * will map it. */
+  if (!meta_is_wayland_compositor ())
+    x11_display->composite_overlay_window = XCompositeGetOverlayWindow (xdisplay, xroot);
+
   return TRUE;
 }
 
@@ -462,14 +618,25 @@ meta_x11_display_close (MetaX11Display  *display,
    */
   g_hash_table_destroy (display->xids);
 
+  XDestroyWindow (display->xdisplay,
+                  display->wm_sn_selection_window);
+
   if (display->leader_window != None)
     XDestroyWindow (display->xdisplay, display->leader_window);
+
+  meta_error_trap_push ();
+  XSelectInput (display->xdisplay, display->xroot, 0);
+  if (meta_error_trap_pop_with_return () != Success)
+    meta_warning ("Could not release screen %d on display \"%s\"\n",
+                  meta_ui_get_screen_number (),
+                  display->name);
 
   XFlush (display->xdisplay);
 
   meta_display_free_window_prop_hooks (display);
   meta_display_free_group_prop_hooks (display);
 
+  g_free (display->screen_name);
   g_free (display->name);
 
   g_object_unref (display);
@@ -787,6 +954,104 @@ meta_display_focus_the_no_focus_window (MetaDisplay *display,
   request_xserver_input_focus_change (display->x11_display,
                                       screen,
                                       NULL,
-                                      screen->no_focus_window,
+                                      display->x11_display->no_focus_window,
                                       timestamp);
+}
+
+static char*
+get_screen_name (Display *xdisplay,
+                 int      number)
+{
+  char *p;
+  char *dname;
+  char *scr;
+
+  /* DisplayString gives us a sort of canonical display,
+   * vs. the user-entered name from XDisplayName()
+   */
+  dname = g_strdup (DisplayString (xdisplay));
+
+  /* Change display name to specify this screen.
+   */
+  p = strrchr (dname, ':');
+  if (p)
+    {
+      p = strchr (p, '.');
+      if (p)
+        *p = '\0';
+    }
+
+  scr = g_strdup_printf ("%s.%d", dname, number);
+
+  g_free (dname);
+
+  return scr;
+}
+
+Window
+meta_create_offscreen_window (Display *xdisplay,
+                              Window   parent,
+                              long     valuemask)
+{
+  XSetWindowAttributes attrs;
+
+  /* we want to be override redirect because sometimes we
+   * create a window on a screen we aren't managing.
+   * (but on a display we are managing at least one screen for)
+   */
+  attrs.override_redirect = True;
+  attrs.event_mask = valuemask;
+
+  return XCreateWindow (xdisplay,
+                        parent,
+                        -100, -100, 1, 1,
+                        0,
+                        CopyFromParent,
+                        CopyFromParent,
+                        (Visual *)CopyFromParent,
+                        CWOverrideRedirect | CWEventMask,
+                        &attrs);
+}
+
+/**
+ * meta_x11_display_get_xroot: (skip)
+ * @screen: A #MetaX11Display
+ *
+ */
+Window
+meta_x11_display_get_xroot (MetaX11Display *x11_display)
+{
+  return x11_display->xroot;
+}
+
+void
+meta_x11_display_set_cm_selection (MetaX11Display *x11_display)
+{
+  char selection[32];
+  Atom a;
+  guint32 timestamp;
+
+  timestamp = meta_x11_display_get_current_time_roundtrip (x11_display);
+  g_snprintf (selection, sizeof (selection), "_NET_WM_CM_S%d",
+              meta_ui_get_screen_number ());
+  a = XInternAtom (x11_display->xdisplay, selection, False);
+  x11_display->wm_cm_selection_window = take_manager_selection (x11_display,
+                                                                x11_display->xroot,
+							        a, timestamp, TRUE);
+}
+
+/**
+ * meta_x11_display_xwindow_is_a_no_focus_window:
+ * @x11_display: A #MetaX11Display
+ * @xwindow: An X11 window
+ *
+ * Returns: %TRUE iff window is one of mutter's internal "no focus" windows
+ * (there is one per screen) which will have the focus when there is no
+ * actual client window focused.
+ */
+gboolean
+meta_x11_display_xwindow_is_a_no_focus_window (MetaX11Display *x11_display,
+                                               Window xwindow)
+{
+  return x11_display ? xwindow == x11_display->no_focus_window : FALSE;
 }

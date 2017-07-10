@@ -1670,7 +1670,8 @@ reload_transient_for (MetaWindow    *window,
   else
     meta_verbose ("Window %s is not transient\n", window->desc);
 
-  if (window->xtransient_for == None || window->xtransient_for == window->screen->xroot)
+  if (window->xtransient_for == None ||
+      window->xtransient_for == window->display->x11_display->xroot)
     meta_window_set_transient_for (window, NULL);
   else
     {

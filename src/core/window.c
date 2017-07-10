@@ -7674,7 +7674,6 @@ static gboolean
 window_has_pointer_x11 (MetaWindow *window)
 {
   MetaX11Display *display = window->display->x11_display;
-  MetaScreen *screen = window->screen;
   Window root, child;
   double root_x, root_y, x, y;
   XIButtonState buttons;
@@ -7684,7 +7683,7 @@ window_has_pointer_x11 (MetaWindow *window)
   meta_error_trap_push ();
   XIQueryPointer (display->xdisplay,
                   META_VIRTUAL_CORE_POINTER_ID,
-                  screen->xroot,
+                  display->xroot,
                   &root, &child,
                   &root_x, &root_y, &x, &y,
                   &buttons, &mods, &group);

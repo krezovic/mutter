@@ -1303,12 +1303,15 @@ meta_screen_change_keygrabs (MetaScreen *screen,
   int i;
 
   if (keys->overlay_resolved_key_combo.len != 0)
-    meta_change_keygrab (keys, screen->xroot, grab, &keys->overlay_resolved_key_combo);
+    meta_change_keygrab (keys, display->x11_display->xroot, grab,
+                         &keys->overlay_resolved_key_combo);
 
   for (i = 0; i < keys->n_iso_next_group_combos; i++)
-    meta_change_keygrab (keys, screen->xroot, grab, &keys->iso_next_group_combo[i]);
+    meta_change_keygrab (keys, display->x11_display->xroot, grab,
+                         &keys->iso_next_group_combo[i]);
 
-  change_binding_keygrabs (keys, screen->xroot, FALSE, grab);
+  change_binding_keygrabs (keys, display->x11_display->xroot,
+                           FALSE, grab);
 }
 
 void
@@ -1440,7 +1443,7 @@ meta_display_grab_accelerator (MetaDisplay *display,
       return META_KEYBINDING_ACTION_NONE;
     }
 
-  meta_change_keygrab (keys, display->screen->xroot, TRUE, &resolved_combo);
+  meta_change_keygrab (keys, display->x11_display->xroot, TRUE, &resolved_combo);
 
   grab = g_new0 (MetaKeyGrab, 1);
   grab->action = next_dynamic_keybinding_action ();
@@ -1484,7 +1487,7 @@ meta_display_ungrab_accelerator (MetaDisplay *display,
     {
       int i;
 
-      meta_change_keygrab (keys, display->screen->xroot, FALSE, &binding->resolved_combo);
+      meta_change_keygrab (keys, display->x11_display->xroot, FALSE, &binding->resolved_combo);
 
       for (i = 0; i < binding->resolved_combo.len; i++)
         {
@@ -2843,7 +2846,7 @@ handle_panel (MetaDisplay     *display,
     }
 
   ev.type = ClientMessage;
-  ev.window = screen->xroot;
+  ev.window = display->x11_display->xroot;
   ev.message_type = XATOM(display, atom__GNOME_PANEL_ACTION);
   ev.format = 32;
   ev.data.l[0] = action_atom;
@@ -2860,7 +2863,7 @@ handle_panel (MetaDisplay     *display,
   XUngrabKeyboard (display->x11_display->xdisplay, event->time);
 
   XSendEvent (display->x11_display->xdisplay,
-	      screen->xroot,
+	      display->x11_display->xroot,
 	      False,
 	      StructureNotifyMask,
 	      (XEvent*) &ev);

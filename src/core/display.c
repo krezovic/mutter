@@ -628,7 +628,7 @@ meta_display_open (void)
 
   if (!meta_is_wayland_compositor ())
     meta_prop_get_window (display->x11_display,
-                          display->screen->xroot,
+                          display->x11_display->xroot,
                           display->x11_display->atom__NET_ACTIVE_WINDOW,
                           &old_active_xwindow);
 
@@ -1063,9 +1063,14 @@ meta_display_sync_wayland_input_focus (MetaDisplay *display)
   MetaBackend *backend = meta_get_backend ();
   MetaStage *stage = META_STAGE (meta_backend_get_stage (backend));
 
+  MetaX11Display *x11_display = display->x11_display;
+  gboolean is_focus_xwindow =
+    meta_x11_display_xwindow_is_a_no_focus_window (x11_display,
+                                                   x11_display->focus_xwindow);
+
   if (!meta_display_windows_are_interactable (display))
     focus_window = NULL;
-  else if (meta_display_xwindow_is_a_no_focus_window (display, display->x11_display->focus_xwindow))
+  else if (x11_display && is_focus_xwindow)
     focus_window = NULL;
   else if (display->focus_window && display->focus_window->surface)
     focus_window = display->focus_window;
@@ -1212,22 +1217,6 @@ meta_display_notify_window_created (MetaDisplay  *display,
                                     MetaWindow   *window)
 {
   g_signal_emit (display, display_signals[WINDOW_CREATED], 0, window);
-}
-
-/**
- * meta_display_xwindow_is_a_no_focus_window:
- * @display: A #MetaDisplay
- * @xwindow: An X11 window
- *
- * Returns: %TRUE iff window is one of mutter's internal "no focus" windows
- * (there is one per screen) which will have the focus when there is no
- * actual client window focused.
- */
-gboolean
-meta_display_xwindow_is_a_no_focus_window (MetaDisplay *display,
-                                           Window xwindow)
-{
-  return xwindow == display->screen->no_focus_window;
 }
 
 static MetaCursor
@@ -1583,7 +1572,7 @@ meta_display_update_active_window_hint (MetaDisplay *display)
 
   meta_error_trap_push ();
   XChangeProperty (display->x11_display->xdisplay,
-                   display->screen->xroot,
+                   display->x11_display->xroot,
                    display->x11_display->atom__NET_ACTIVE_WINDOW,
                    XA_WINDOW,
                    32, PropModeReplace, (guchar*) data, 1);
@@ -2203,7 +2192,7 @@ meta_display_increment_focus_sentinel (MetaDisplay *display)
   data[0] = meta_display_get_current_time (display);
 
   XChangeProperty (display->x11_display->xdisplay,
-                   display->screen->xroot,
+                   display->x11_display->xroot,
                    display->x11_display->atom__MUTTER_SENTINEL,
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);

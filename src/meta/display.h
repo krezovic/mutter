@@ -79,9 +79,6 @@ MetaCompositor *meta_display_get_compositor (MetaDisplay *display);
 
 MetaWindow *meta_display_get_focus_window (MetaDisplay *display);
 
-gboolean  meta_display_xwindow_is_a_no_focus_window (MetaDisplay *display,
-                                                     Window xwindow);
-
 gboolean meta_display_xserver_time_is_before (MetaDisplay *display,
                                               guint32      time1,
                                               guint32      time2);

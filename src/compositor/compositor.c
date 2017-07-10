@@ -446,7 +446,7 @@ redirect_windows (MetaScreen *screen)
 {
   MetaDisplay *display       = meta_screen_get_display (screen);
   Display     *xdisplay      = meta_display_get_xdisplay (display);
-  Window       xroot         = meta_screen_get_xroot (screen);
+  Window       xroot         = display->x11_display->xroot;
   int          screen_number = meta_screen_get_screen_number (screen);
   guint        n_retries;
   guint        max_retries;
@@ -492,7 +492,7 @@ meta_compositor_manage (MetaCompositor *compositor)
   MetaScreen *screen = display->screen;
   MetaBackend *backend = meta_get_backend ();
 
-  meta_screen_set_cm_selection (display->screen);
+  meta_x11_display_set_cm_selection (display->x11_display);
 
   compositor->stage = meta_backend_get_stage (backend);
 
@@ -532,7 +532,7 @@ meta_compositor_manage (MetaCompositor *compositor)
     {
       Window xwin;
 
-      compositor->output = screen->composite_overlay_window;
+      compositor->output = display->x11_display->composite_overlay_window;
 
       xwin = meta_backend_x11_get_xwindow (META_BACKEND_X11 (backend));
 
@@ -570,7 +570,7 @@ meta_compositor_unmanage (MetaCompositor *compositor)
     {
       MetaDisplay *display = compositor->display;
       Display *xdisplay = meta_display_get_xdisplay (display);
-      Window xroot = display->screen->xroot;
+      Window xroot = display->x11_display->xroot;
 
       /* This is the most important part of cleanup - we have to do this
        * before giving up the window manager selection or the next

@@ -55,8 +55,11 @@ struct _MetaX11Display
   MetaDisplay *display;
 
   char *name;
+  char *screen_name;
+
   Display *xdisplay;
 
+  Window xroot;
   Window leader_window;
   Window timestamp_pinging_window;
 
@@ -70,6 +73,13 @@ struct _MetaX11Display
 #include <x11/atomnames.h>
 #undef item
 
+  Window composite_overlay_window;
+
+  /* This window holds the focus when we don't want to focus
+   * any actual clients
+   */
+  Window no_focus_window;
+
   /* The window and serial of the most recent FocusIn event. */
   Window server_focus_window;
   gulong server_focus_serial;
@@ -81,6 +91,11 @@ struct _MetaX11Display
 
   /* last timestamp passed to XSetInputFocus */
   guint32 last_focus_time;
+
+  Window wm_cm_selection_window;
+  Window wm_sn_selection_window;
+  Atom wm_sn_atom;
+  guint32 wm_sn_timestamp;
 
   GHashTable *xids;
 
@@ -179,5 +194,9 @@ guint32 meta_x11_display_get_current_time_roundtrip (MetaX11Display *display);
 
 /* make a request to ensure the event serial has changed */
 void meta_x11_display_increment_event_serial (MetaX11Display *display);
+
+Window meta_create_offscreen_window (Display *xdisplay,
+                                     Window   parent,
+                                     long     valuemask);
 
 #endif

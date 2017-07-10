@@ -64,9 +64,7 @@
 
 #define XDISPLAY(x) (x->display->x11_display->xdisplay)
 #define XATOM(x, y) (x->display->x11_display->y)
-
-static char* get_screen_name (MetaDisplay *display,
-                              int          number);
+#define XROOT(x) (x->display->x11_display->xroot)
 
 static void update_num_workspaces  (MetaScreen *screen,
                                     guint32     timestamp);
@@ -285,7 +283,8 @@ set_wm_check_hint (MetaScreen *screen)
 
   data[0] = screen->display->x11_display->leader_window;
 
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_SUPPORTING_WM_CHECK),
                    XA_WINDOW,
                    32, PropModeReplace, (guchar*) data, 1);
@@ -296,7 +295,8 @@ set_wm_check_hint (MetaScreen *screen)
 static void
 unset_wm_check_hint (MetaScreen *screen)
 {
-  XDeleteProperty (XDISPLAY(screen), screen->xroot,
+  XDeleteProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_SUPPORTING_WM_CHECK));
 }
 
@@ -314,7 +314,8 @@ set_supported_hint (MetaScreen *screen)
     XATOM(screen, atom__GTK_SHOW_WINDOW_MENU),
   };
 
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_SUPPORTED),
                    XA_ATOM,
                    32, PropModeReplace,
@@ -344,7 +345,8 @@ set_wm_icon_size_hint (MetaScreen *screen)
   vals[5] = 0;
 #undef LEGACY_ICON_SIZE
 
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom_WM_ICON_SIZE),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) vals, N_VALS);
@@ -509,7 +511,7 @@ create_guard_window (Display *xdisplay, MetaScreen *screen)
   create_serial = XNextRequest(xdisplay);
   guard_window =
     XCreateWindow (xdisplay,
-		   screen->xroot,
+		   XROOT(screen),
 		   0, /* x */
 		   0, /* y */
 		   screen->rect.width,
@@ -555,81 +557,6 @@ create_guard_window (Display *xdisplay, MetaScreen *screen)
   return guard_window;
 }
 
-static Window
-take_manager_selection (MetaDisplay *display,
-                        Window       xroot,
-                        Atom         manager_atom,
-                        int          timestamp,
-                        gboolean     should_replace)
-{
-  Display *xdisplay = display->x11_display->xdisplay;
-  Window current_owner, new_owner;
-
-  current_owner = XGetSelectionOwner (xdisplay, manager_atom);
-  if (current_owner != None)
-    {
-      XSetWindowAttributes attrs;
-
-      if (should_replace)
-        {
-          /* We want to find out when the current selection owner dies */
-          meta_error_trap_push ();
-          attrs.event_mask = StructureNotifyMask;
-          XChangeWindowAttributes (xdisplay, current_owner, CWEventMask, &attrs);
-          if (meta_error_trap_pop_with_return () != Success)
-            current_owner = None; /* don't wait for it to die later on */
-        }
-      else
-        {
-          meta_warning (_("Display “%s” already has a window manager; try using the --replace option to replace the current window manager."),
-                        display->x11_display->name);
-          return None;
-        }
-    }
-
-  /* We need SelectionClear and SelectionRequest events on the new owner,
-   * but those cannot be masked, so we only need NoEventMask.
-   */
-  new_owner = meta_create_offscreen_window (xdisplay, xroot, NoEventMask);
-
-  XSetSelectionOwner (xdisplay, manager_atom, new_owner, timestamp);
-
-  if (XGetSelectionOwner (xdisplay, manager_atom) != new_owner)
-    {
-      meta_warning ("Could not acquire selection: %s", XGetAtomName (xdisplay, manager_atom));
-      return None;
-    }
-
-  {
-    /* Send client message indicating that we are now the selection owner */
-    XClientMessageEvent ev;
-
-    ev.type = ClientMessage;
-    ev.window = xroot;
-    ev.message_type = display->x11_display->atom_MANAGER;
-    ev.format = 32;
-    ev.data.l[0] = timestamp;
-    ev.data.l[1] = manager_atom;
-
-    XSendEvent (xdisplay, xroot, False, StructureNotifyMask, (XEvent *) &ev);
-  }
-
-  /* Wait for old window manager to go away */
-  if (current_owner != None)
-    {
-      XEvent event;
-
-      /* We sort of block infinitely here which is probably lame. */
-
-      meta_verbose ("Waiting for old window manager to exit\n");
-      do
-        XWindowEvent (xdisplay, current_owner, StructureNotifyMask, &event);
-      while (event.type != DestroyNotify);
-    }
-
-  return new_owner;
-}
-
 MetaScreen*
 meta_screen_new (MetaDisplay *display,
                  guint32      timestamp)
@@ -637,15 +564,8 @@ meta_screen_new (MetaDisplay *display,
   MetaScreen *screen;
   int number;
   Screen *xscreen;
-  Window xroot;
   Display *xdisplay;
-  Window new_wm_sn_owner;
-  gboolean replace_current_wm;
-  Atom wm_sn_atom;
-  char buf[128];
   MetaMonitorManager *manager;
-
-  replace_current_wm = meta_get_replace_current_wm ();
 
   number = meta_ui_get_screen_number ();
 
@@ -659,57 +579,10 @@ meta_screen_new (MetaDisplay *display,
   meta_verbose ("Trying screen %d on display '%s'\n",
                 number, display->x11_display->name);
 
-  xroot = RootWindow (xdisplay, number);
-
-  /* FVWM checks for None here, I don't know if this
-   * ever actually happens
-   */
-  if (xroot == None)
-    {
-      meta_warning (_("Screen %d on display “%s” is invalid\n"),
-                    number, display->x11_display->name);
-      return NULL;
-    }
-
-  sprintf (buf, "WM_S%d", number);
-
-  wm_sn_atom = XInternAtom (xdisplay, buf, False);
-  new_wm_sn_owner = take_manager_selection (display, xroot, wm_sn_atom, timestamp, replace_current_wm);
-  if (new_wm_sn_owner == None)
-    return NULL;
-
-  {
-    long event_mask;
-    unsigned char mask_bits[XIMaskLen (XI_LASTEVENT)] = { 0 };
-    XIEventMask mask = { XIAllMasterDevices, sizeof (mask_bits), mask_bits };
-
-    XISetMask (mask.mask, XI_Enter);
-    XISetMask (mask.mask, XI_Leave);
-    XISetMask (mask.mask, XI_FocusIn);
-    XISetMask (mask.mask, XI_FocusOut);
-#ifdef HAVE_XI23
-    if (META_X11_DISPLAY_HAS_XINPUT_23 (display->x11_display))
-      {
-        XISetMask (mask.mask, XI_BarrierHit);
-        XISetMask (mask.mask, XI_BarrierLeave);
-      }
-#endif /* HAVE_XI23 */
-    XISelectEvents (xdisplay, xroot, &mask, 1);
-
-    event_mask = (SubstructureRedirectMask | SubstructureNotifyMask |
-                  StructureNotifyMask | ColormapChangeMask | PropertyChangeMask);
-    XSelectInput (xdisplay, xroot, event_mask);
-  }
-
-  /* Select for cursor changes so the cursor tracker is up to date. */
-  XFixesSelectCursorInput (xdisplay, xroot, XFixesDisplayCursorNotifyMask);
-
   screen = g_object_new (META_TYPE_SCREEN, NULL);
   screen->closing = 0;
 
   screen->display = display;
-  screen->screen_name = get_screen_name (display, number);
-  screen->xroot = xroot;
   screen->rect.x = screen->rect.y = 0;
 
   manager = meta_monitor_manager_get ();
@@ -724,9 +597,6 @@ meta_screen_new (MetaDisplay *display,
   screen->default_xvisual = DefaultVisualOfScreen (xscreen);
   screen->default_depth = DefaultDepthOfScreen (xscreen);
 
-  screen->wm_sn_selection_window = new_wm_sn_owner;
-  screen->wm_sn_atom = wm_sn_atom;
-  screen->wm_sn_timestamp = timestamp;
   screen->work_area_later = 0;
   screen->check_fullscreen_later = 0;
 
@@ -738,11 +608,6 @@ meta_screen_new (MetaDisplay *display,
   screen->starting_corner = META_SCREEN_TOPLEFT;
   screen->guard_window = None;
 
-  /* If we're a Wayland compositor, then we don't grab the COW, since it
-   * will map it. */
-  if (!meta_is_wayland_compositor ())
-    screen->composite_overlay_window = XCompositeGetOverlayWindow (xdisplay, xroot);
-
   /* Now that we've gotten taken a reference count on the COW, we
    * can close the helper that is holding on to it */
   meta_restart_finish ();
@@ -750,14 +615,6 @@ meta_screen_new (MetaDisplay *display,
   reload_logical_monitors (screen);
 
   meta_screen_set_cursor (screen, META_CURSOR_DEFAULT);
-
-  /* Handle creating a no_focus_window for this screen */
-  screen->no_focus_window =
-    meta_create_offscreen_window (display->x11_display->xdisplay,
-                                  screen->xroot,
-                                  FocusChangeMask|KeyPressMask|KeyReleaseMask);
-  XMapWindow (display->x11_display->xdisplay, screen->no_focus_window);
-  /* Done with no_focus_window stuff */
 
   set_wm_icon_size_hint (screen);
 
@@ -789,7 +646,9 @@ meta_screen_new (MetaDisplay *display,
   meta_prefs_add_listener (prefs_changed_callback, screen);
 
   meta_verbose ("Added screen %d ('%s') root 0x%lx\n",
-                number, screen->screen_name, screen->xroot);
+                number,
+                screen->display->x11_display->screen_name,
+                XROOT(screen));
 
   return screen;
 }
@@ -803,11 +662,11 @@ meta_screen_init_workspaces (MetaScreen *screen)
 
   g_return_if_fail (META_IS_SCREEN (screen));
 
-  timestamp = screen->wm_sn_timestamp;
+  timestamp = screen->display->x11_display->wm_sn_timestamp;
 
   /* Get current workspace */
   if (meta_prop_get_cardinal (screen->display->x11_display,
-                              screen->xroot,
+                              XROOT(screen),
                               XATOM(screen, atom__NET_CURRENT_DESKTOP),
                               &current_workspace_index))
     meta_verbose ("Read existing _NET_CURRENT_DESKTOP = %d\n",
@@ -852,17 +711,7 @@ meta_screen_free (MetaScreen *screen,
   meta_stack_free (screen->stack);
   meta_stack_tracker_free (screen->stack_tracker);
 
-  meta_error_trap_push ();
-  XSelectInput (XDISPLAY(screen), screen->xroot, 0);
-  if (meta_error_trap_pop_with_return () != Success)
-    meta_warning ("Could not release screen %d on display \"%s\"\n",
-                  meta_ui_get_screen_number (),
-                  screen->display->x11_display->name);
-
   unset_wm_check_hint (screen);
-
-  XDestroyWindow (XDISPLAY(screen),
-                  screen->wm_sn_selection_window);
 
   if (screen->work_area_later != 0)
     meta_later_remove (screen->work_area_later);
@@ -871,8 +720,6 @@ meta_screen_free (MetaScreen *screen,
 
   if (screen->tile_preview_timeout_id)
     g_source_remove (screen->tile_preview_timeout_id);
-
-  g_free (screen->screen_name);
 
   g_object_unref (screen);
 }
@@ -929,37 +776,6 @@ prefs_changed_callback (MetaPreference pref,
     {
       set_workspace_names (screen);
     }
-}
-
-
-static char*
-get_screen_name (MetaDisplay *display,
-                 int          number)
-{
-  char *p;
-  char *dname;
-  char *scr;
-
-  /* DisplayString gives us a sort of canonical display,
-   * vs. the user-entered name from XDisplayName()
-   */
-  dname = g_strdup (DisplayString (display->x11_display->xdisplay));
-
-  /* Change display name to specify this screen.
-   */
-  p = strrchr (dname, ':');
-  if (p)
-    {
-      p = strchr (p, '.');
-      if (p)
-        *p = '\0';
-    }
-
-  scr = g_strdup_printf ("%s.%d", dname, number);
-
-  g_free (dname);
-
-  return scr;
 }
 
 void
@@ -1020,7 +836,8 @@ set_number_of_spaces_hint (MetaScreen *screen,
   meta_verbose ("Setting _NET_NUMBER_OF_DESKTOPS to %lu\n", data[0]);
 
   meta_error_trap_push ();
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_NUMBER_OF_DESKTOPS),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
@@ -1041,7 +858,8 @@ set_desktop_geometry_hint (MetaScreen *screen)
   meta_verbose ("Setting _NET_DESKTOP_GEOMETRY to %lu, %lu\n", data[0], data[1]);
 
   meta_error_trap_push ();
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_DESKTOP_GEOMETRY),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 2);
@@ -1065,7 +883,8 @@ set_desktop_viewport_hint (MetaScreen *screen)
   meta_verbose ("Setting _NET_DESKTOP_VIEWPORT to 0, 0\n");
 
   meta_error_trap_push ();
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_DESKTOP_VIEWPORT),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 2);
@@ -1201,7 +1020,7 @@ update_num_workspaces (MetaScreen *screen,
       list = NULL;
 
       if (meta_prop_get_cardinal_list (screen->display->x11_display,
-                                       screen->xroot,
+                                       XROOT(screen),
                                        XATOM(screen, atom__NET_NUMBER_OF_DESKTOPS),
                                        &list, &n_items))
         {
@@ -1386,7 +1205,7 @@ meta_screen_update_cursor (MetaScreen *screen)
   /* Set a cursor for X11 applications that don't specify their own */
   xcursor = meta_display_create_x_cursor (display, cursor);
 
-  XDefineCursor (display->x11_display->xdisplay, screen->xroot, xcursor);
+  XDefineCursor (display->x11_display->xdisplay, XROOT(screen), xcursor);
   XFlush (display->x11_display->xdisplay);
   XFreeCursor (display->x11_display->xdisplay, xcursor);
 }
@@ -1663,7 +1482,7 @@ meta_screen_update_workspace_layout (MetaScreen *screen)
   n_items = 0;
 
   if (meta_prop_get_cardinal_list (screen->display->x11_display,
-                                   screen->xroot,
+                                   XROOT(screen),
                                    XATOM(screen, atom__NET_DESKTOP_LAYOUT),
                                    &list, &n_items))
     {
@@ -1813,7 +1632,7 @@ set_workspace_names (MetaScreen *screen)
 
   meta_error_trap_push ();
   XChangeProperty (XDISPLAY(screen),
-                   screen->xroot,
+                   XROOT(screen),
                    XATOM(screen, atom__NET_DESKTOP_NAMES),
                    XATOM(screen, atom_UTF8_STRING),
                    8, PropModeReplace,
@@ -1837,7 +1656,7 @@ meta_screen_update_workspace_names (MetaScreen *screen)
   names = NULL;
   n_names = 0;
   if (!meta_prop_get_utf8_list (screen->display->x11_display,
-                                screen->xroot,
+                                XROOT(screen),
                                 XATOM(screen, atom__NET_DESKTOP_NAMES),
                                 &names, &n_names))
     {
@@ -1857,31 +1676,6 @@ meta_screen_update_workspace_names (MetaScreen *screen)
     }
 
   g_strfreev (names);
-}
-
-Window
-meta_create_offscreen_window (Display *xdisplay,
-                              Window   parent,
-                              long     valuemask)
-{
-  XSetWindowAttributes attrs;
-
-  /* we want to be override redirect because sometimes we
-   * create a window on a screen we aren't managing.
-   * (but on a display we are managing at least one screen for)
-   */
-  attrs.override_redirect = True;
-  attrs.event_mask = valuemask;
-
-  return XCreateWindow (xdisplay,
-                        parent,
-                        -100, -100, 1, 1,
-                        0,
-                        CopyFromParent,
-                        CopyFromParent,
-                        (Visual *)CopyFromParent,
-                        CWOverrideRedirect | CWEventMask,
-                        &attrs);
 }
 
 static void
@@ -1910,7 +1704,8 @@ set_work_area_hint (MetaScreen *screen)
     }
 
   meta_error_trap_push ();
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
 		   XATOM(screen, atom__NET_WORKAREA),
 		   XA_CARDINAL, 32, PropModeReplace,
 		   (guchar*) data, num_workspaces*4);
@@ -2311,7 +2106,8 @@ meta_screen_update_showing_desktop_hint (MetaScreen *screen)
   data[0] = screen->active_workspace->showing_desktop ? 1 : 0;
 
   meta_error_trap_push ();
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_SHOWING_DESKTOP),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
@@ -2565,17 +2361,6 @@ meta_screen_get_display (MetaScreen *screen)
 }
 
 /**
- * meta_screen_get_xroot: (skip)
- * @screen: A #MetaScreen
- *
- */
-Window
-meta_screen_get_xroot (MetaScreen *screen)
-{
-  return screen->xroot;
-}
-
-/**
  * meta_screen_get_size:
  * @screen: A #MetaScreen
  * @width: (out): The width of the screen
@@ -2593,20 +2378,6 @@ meta_screen_get_size (MetaScreen *screen,
 
   if (height != NULL)
     *height = screen->rect.height;
-}
-
-void
-meta_screen_set_cm_selection (MetaScreen *screen)
-{
-  char selection[32];
-  Atom a;
-  guint32 timestamp;
-
-  timestamp = meta_display_get_current_time_roundtrip (screen->display);
-  g_snprintf (selection, sizeof (selection), "_NET_WM_CM_S%d",
-              meta_ui_get_screen_number ());
-  a = XInternAtom (XDISPLAY(screen), selection, False);
-  screen->wm_cm_selection_window = take_manager_selection (screen->display, screen->xroot, a, timestamp, TRUE);
 }
 
 /**
@@ -2688,7 +2459,8 @@ meta_screen_set_active_workspace_hint (MetaScreen *screen)
   meta_verbose ("Setting _NET_CURRENT_DESKTOP to %lu\n", data[0]);
 
   meta_error_trap_push ();
-  XChangeProperty (XDISPLAY(screen), screen->xroot,
+  XChangeProperty (XDISPLAY(screen),
+                   XROOT(screen),
                    XATOM(screen, atom__NET_CURRENT_DESKTOP),
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);

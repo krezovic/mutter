@@ -679,7 +679,7 @@ test_case_check_xserver_stacking (TestCase *test,
   Window *children;
   unsigned int n_children;
   XQueryTree (display->x11_display->xdisplay,
-              meta_screen_get_xroot (display->screen),
+              display->x11_display->xroot,
               &root, &parent, &children, &n_children);
 
   for (i = 0; i < (int)n_children; i++)

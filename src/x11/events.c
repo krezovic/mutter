@@ -634,7 +634,6 @@ static char *
 meta_spew_event (MetaX11Display *display,
                  XEvent         *event)
 {
-  MetaScreen *screen = display->display->screen;
   const char *name = NULL;
   char *extra = NULL;
   char *winname;
@@ -648,7 +647,7 @@ meta_spew_event (MetaX11Display *display,
   else
     meta_spew_core_event (display, event, &name, &extra);
 
-  if (event->xany.window == screen->xroot)
+  if (event->xany.window == display->xroot)
     winname = g_strdup_printf ("root");
   else
     winname = g_strdup_printf ("0x%lx", event->xany.window);
@@ -711,9 +710,9 @@ handle_window_focus_event (MetaX11Display *display,
       else
         window_type = "unknown client window";
     }
-  else if (meta_display_xwindow_is_a_no_focus_window (display->display, event->event))
+  else if (meta_x11_display_xwindow_is_a_no_focus_window (display, event->event))
     window_type = "no_focus_window";
-  else if (event->event == display->display->screen->xroot)
+  else if (event->event == display->xroot)
     window_type = "root window";
   else
     window_type = "unknown window";
@@ -1006,7 +1005,7 @@ convert_property (MetaX11Display *display,
   else if (target == display->atom_TIMESTAMP)
     XChangeProperty (display->xdisplay, w, property,
 		     XA_INTEGER, 32, PropModeReplace,
-		     (unsigned char *)&screen->wm_sn_timestamp, 1);
+		     (unsigned char *)&display->wm_sn_timestamp, 1);
   else if (target == display->atom_VERSION)
     XChangeProperty (display->xdisplay, w, property,
 		     XA_INTEGER, 32, PropModeReplace,
@@ -1038,8 +1037,8 @@ process_selection_request (MetaX11Display *display,
   MetaScreen *screen = display->display->screen;
   XSelectionEvent reply;
 
-  if (screen->wm_sn_selection_window != event->xselectionrequest.owner ||
-      screen->wm_sn_atom != event->xselectionrequest.selection)
+  if (display->wm_sn_selection_window != event->xselectionrequest.owner ||
+      display->wm_sn_atom != event->xselectionrequest.selection)
     {
       char *str;
 
@@ -1137,8 +1136,8 @@ process_selection_clear (MetaX11Display *display,
 {
   MetaScreen *screen = display->display->screen;
 
-  if (screen->wm_sn_selection_window != event->xselectionclear.window ||
-      screen->wm_sn_atom != event->xselectionclear.selection)
+  if (display->wm_sn_selection_window != event->xselectionclear.window ||
+      display->wm_sn_atom != event->xselectionclear.selection)
     {
       char *str;
 
@@ -1278,7 +1277,7 @@ handle_other_xevent (MetaX11Display *display,
       break;
     case CreateNotify:
       {
-        if (event->xcreatewindow.parent == display->display->screen->xroot)
+        if (event->xcreatewindow.parent == display->xroot)
           meta_stack_tracker_create_event (display->display->screen->stack_tracker,
                                            &event->xcreatewindow);
       }
@@ -1286,7 +1285,7 @@ handle_other_xevent (MetaX11Display *display,
 
     case DestroyNotify:
       {
-        if (event->xdestroywindow.event == display->display->screen->xroot)
+        if (event->xdestroywindow.event == display->xroot)
           meta_stack_tracker_destroy_event (display->display->screen->stack_tracker,
                                             &event->xdestroywindow);
       }
@@ -1361,7 +1360,7 @@ handle_other_xevent (MetaX11Display *display,
       /* NB: override redirect windows wont cause a map request so we
        * watch out for map notifies against any root windows too if a
        * compositor is enabled: */
-      if (window == NULL && event->xmap.event == display->display->screen->xroot)
+      if (window == NULL && event->xmap.event == display->xroot)
         {
           window = meta_window_x11_new (display->display, event->xmap.window,
                                         FALSE, META_COMP_EFFECT_CREATE);
@@ -1404,7 +1403,7 @@ handle_other_xevent (MetaX11Display *display,
       break;
     case ReparentNotify:
       {
-        if (event->xreparent.event == display->display->screen->xroot)
+        if (event->xreparent.event == display->xroot)
           meta_stack_tracker_reparent_event (display->display->screen->stack_tracker,
                                              &event->xreparent);
       }
@@ -1412,8 +1411,8 @@ handle_other_xevent (MetaX11Display *display,
     case ConfigureNotify:
       if (event->xconfigure.event != event->xconfigure.window)
         {
-          if (event->xconfigure.event == display->display->screen->xroot &&
-              event->xconfigure.window != display->display->screen->composite_overlay_window)
+          if (event->xconfigure.event == display->xroot &&
+              event->xconfigure.window != display->composite_overlay_window)
             meta_stack_tracker_configure_event (display->display->screen->stack_tracker,
                                                 &event->xconfigure);
         }
@@ -1479,7 +1478,7 @@ handle_other_xevent (MetaX11Display *display,
         if (group != NULL)
           meta_group_property_notify (group, event);
 
-        if (event->xproperty.window == display->display->screen->xroot)
+        if (event->xproperty.window == display->xroot)
           {
             if (event->xproperty.atom ==
                 display->atom__NET_DESKTOP_LAYOUT)
@@ -1523,7 +1522,7 @@ handle_other_xevent (MetaX11Display *display,
         }
       else
         {
-          if (event->xclient.window == display->display->screen->xroot)
+          if (event->xclient.window == display->xroot)
             {
               if (event->xclient.message_type ==
                   display->atom__NET_CURRENT_DESKTOP)
@@ -1744,7 +1743,7 @@ meta_display_handle_xevent (MetaX11Display *display,
                                         FALSE);
     }
 
-  if (event->xany.window == display->display->screen->xroot)
+  if (event->xany.window == display->xroot)
     {
       if (meta_screen_handle_xevent (display->display->screen, event))
         {

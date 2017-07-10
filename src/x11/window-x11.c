@@ -2840,19 +2840,19 @@ is_our_xwindow (MetaDisplay       *display,
                 Window             xwindow,
                 XWindowAttributes *attrs)
 {
-  if (xwindow == screen->no_focus_window)
+  if (xwindow == display->x11_display->no_focus_window)
     return TRUE;
 
-  if (xwindow == screen->wm_sn_selection_window)
+  if (xwindow == display->x11_display->wm_sn_selection_window)
     return TRUE;
 
-  if (xwindow == screen->wm_cm_selection_window)
+  if (xwindow == display->x11_display->wm_cm_selection_window)
     return TRUE;
 
   if (xwindow == screen->guard_window)
     return TRUE;
 
-  if (xwindow == screen->composite_overlay_window)
+  if (xwindow == display->x11_display->composite_overlay_window)
     return TRUE;
 
   {
@@ -2904,7 +2904,7 @@ meta_window_x11_new (MetaDisplay       *display,
 
   meta_verbose ("Attempting to manage 0x%lx\n", xwindow);
 
-  if (meta_display_xwindow_is_a_no_focus_window (display, xwindow))
+  if (meta_x11_display_xwindow_is_a_no_focus_window (display->x11_display, xwindow))
     {
       meta_verbose ("Not managing no_focus_window 0x%lx\n",
                     xwindow);
@@ -2927,7 +2927,7 @@ meta_window_x11_new (MetaDisplay       *display,
       goto error;
     }
 
-  if (attrs.root != screen->xroot)
+  if (attrs.root != display->x11_display->xroot)
     {
       meta_verbose ("Not on our screen\n");
       goto error;
