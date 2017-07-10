@@ -965,7 +965,7 @@ compute_resistance_and_snapping_edges (MetaDisplay *display)
    * 1st: Get the list of relevant windows, from bottom to top
    */
   stacked_windows =
-    meta_stack_list_windows (display->screen->stack,
+    meta_stack_list_windows (display->stack,
                              display->screen->active_workspace);
 
   /*
@@ -1027,7 +1027,7 @@ compute_resistance_and_snapping_edges (MetaDisplay *display)
            * by other windows or DOCKS, but that's handled below).
            */
           meta_rectangle_intersect (&cur_rect,
-                                    &display->screen->rect,
+                                    &display->rect,
                                     &reduced);
 
           new_edges = NULL;

@@ -1310,7 +1310,7 @@ meta_window_x11_update_struts (MetaWindow *window)
 
               temp = g_new (MetaStrut, 1);
               temp->side = 1 << i; /* See MetaSide def.  Matches nicely, eh? */
-              temp->rect = window->screen->rect;
+              temp->rect = window->display->rect;
               switch (temp->side)
                 {
                 case META_SIDE_RIGHT:
@@ -1373,7 +1373,7 @@ meta_window_x11_update_struts (MetaWindow *window)
 
               temp = g_new (MetaStrut, 1);
               temp->side = 1 << i;
-              temp->rect = window->screen->rect;
+              temp->rect = window->display->rect;
               switch (temp->side)
                 {
                 case META_SIDE_RIGHT:
@@ -1621,17 +1621,17 @@ meta_window_x11_set_net_wm_state (MetaWindow *window)
       if (meta_window_has_fullscreen_monitors (window))
         {
           data[0] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
-                                                           window->fullscreen_monitors.top);
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
+                                                                window->fullscreen_monitors.top);
           data[1] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
-                                                           window->fullscreen_monitors.bottom);
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
+                                                                window->fullscreen_monitors.bottom);
           data[2] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
-                                                           window->fullscreen_monitors.left);
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
+                                                                window->fullscreen_monitors.left);
           data[3] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
-                                                           window->fullscreen_monitors.right);
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
+                                                                window->fullscreen_monitors.right);
 
           meta_verbose ("Setting _NET_WM_FULLSCREEN_MONITORS\n");
           meta_error_trap_push ();
@@ -2684,17 +2684,17 @@ meta_window_x11_client_message (MetaWindow *window,
                     window->desc);
 
       top =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
-                                                       event->xclient.data.l[0]);
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
+                                                            event->xclient.data.l[0]);
       bottom =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
-                                                       event->xclient.data.l[1]);
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
+                                                            event->xclient.data.l[1]);
       left =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
-                                                       event->xclient.data.l[2]);
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
+                                                            event->xclient.data.l[2]);
       right =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
-                                                       event->xclient.data.l[3]);
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
+                                                            event->xclient.data.l[3]);
       /* source_indication = event->xclient.data.l[4]; */
 
       meta_window_update_fullscreen_monitors (window, top, bottom, left, right);
@@ -2849,7 +2849,7 @@ is_our_xwindow (MetaDisplay       *display,
   if (xwindow == display->x11_display->wm_cm_selection_window)
     return TRUE;
 
-  if (xwindow == screen->guard_window)
+  if (xwindow == display->x11_display->guard_window)
     return TRUE;
 
   if (xwindow == display->x11_display->composite_overlay_window)
@@ -3200,7 +3200,7 @@ meta_window_x11_configure_notify (MetaWindow      *window,
    * on its geometry.
    */
   if (window->override_redirect)
-    meta_screen_queue_check_fullscreen (window->screen);
+    meta_display_queue_check_fullscreen (window->display);
 
   if (!event->override_redirect && !event->send_event)
     meta_warning ("Unhandled change of windows override redirect status\n");

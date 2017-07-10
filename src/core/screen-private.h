@@ -38,9 +38,6 @@
 #include "ui.h"
 #include "meta-monitor-manager-private.h"
 
-typedef void (* MetaScreenWindowFunc) (MetaWindow *window,
-                                       gpointer    user_data);
-
 #define META_WIREFRAME_XOR_LINE_WIDTH 2
 
 struct _MetaScreen
@@ -52,7 +49,7 @@ struct _MetaScreen
    // X11
   int default_depth; // X11
   Visual *default_xvisual; // X11
-  MetaRectangle rect;  /* Size of screen; rect.x & rect.y are always 0 */ // non-X11
+     // non-X11
   MetaUI *ui; // X11
 
   guint tile_preview_timeout_id; // non-X11
@@ -63,18 +60,12 @@ struct _MetaScreen
 
   GList *workspaces; // non-X11
 
-  MetaStack *stack; // non-X11
-  MetaStackTracker *stack_tracker; // non-X11
-
-  MetaCursor current_cursor; // non-X11
-
-  gboolean has_xinerama_indices; // X11
+   // X11
 
   GSList *startup_sequences; // non-X11
 
    // X11
   guint work_area_later; // non-X11
-  guint check_fullscreen_later; // non-X11
 
   int rows_of_workspaces; // non-X11 or X11; ask!
   int columns_of_workspaces; // non-X11 or X11; ask!
@@ -85,20 +76,13 @@ struct _MetaScreen
   guint keys_grabbed : 1;
 
   int closing;
-
-  /* Instead of unmapping withdrawn windows we can leave them mapped
-   * and restack them below a guard window. When using a compositor
-   * this allows us to provide live previews of unmapped windows */
-  Window guard_window;
 };
 
 struct _MetaScreenClass
 {
   GObjectClass parent_class;
 
-  void (*restacked)         (MetaScreen *);
   void (*workareas_changed) (MetaScreen *);
-  void (*monitors_changed)  (MetaScreen *);
 };
 
 MetaScreen*   meta_screen_new                 (MetaDisplay                *display,
@@ -106,13 +90,6 @@ MetaScreen*   meta_screen_new                 (MetaDisplay                *displ
 void          meta_screen_free                (MetaScreen                 *screen,
                                                guint32                     timestamp);
 void          meta_screen_init_workspaces     (MetaScreen                 *screen);
-void          meta_screen_manage_all_windows  (MetaScreen                 *screen);
-void          meta_screen_foreach_window      (MetaScreen                 *screen,
-                                               MetaListWindowsFlags        flags,
-                                               MetaScreenWindowFunc        func,
-                                               gpointer                    data);
-
-void          meta_screen_update_cursor       (MetaScreen                 *screen);
 
 void          meta_screen_update_tile_preview          (MetaScreen    *screen,
                                                         gboolean       delay);
@@ -124,7 +101,6 @@ MetaWindow*   meta_screen_get_mouse_window     (MetaScreen                 *scre
 void          meta_screen_update_workspace_layout (MetaScreen             *screen);
 void          meta_screen_update_workspace_names  (MetaScreen             *screen);
 void          meta_screen_queue_workarea_recalc   (MetaScreen             *screen);
-void          meta_screen_queue_check_fullscreen  (MetaScreen             *screen);
 
 typedef struct MetaWorkspaceLayout MetaWorkspaceLayout;
 
@@ -157,7 +133,6 @@ void     meta_screen_update_showing_desktop_hint          (MetaScreen *screen);
 
 gboolean meta_screen_apply_startup_properties (MetaScreen *screen,
                                                MetaWindow *window);
-void     meta_screen_restacked (MetaScreen *screen);
 
 void     meta_screen_workspace_switched (MetaScreen         *screen,
                                          int                 from,
@@ -166,15 +141,7 @@ void     meta_screen_workspace_switched (MetaScreen         *screen,
 
 void meta_screen_set_active_workspace_hint (MetaScreen *screen);
 
-void meta_screen_create_guard_window (MetaScreen *screen);
-
 gboolean meta_screen_handle_xevent (MetaScreen *screen,
                                     XEvent     *xevent);
-
-MetaLogicalMonitor * meta_screen_xinerama_index_to_logical_monitor (MetaScreen *screen,
-                                                                    int         index);
-
-int meta_screen_logical_monitor_to_xinerama_index (MetaScreen         *screen,
-                                                   MetaLogicalMonitor *logical_monitor);
 
 #endif

@@ -75,7 +75,7 @@ meta_window_ensure_frame (MetaWindow *window)
                                           &create_serial);
   frame->xwindow = frame->ui_frame->xwindow;
 
-  meta_stack_tracker_record_add (window->screen->stack_tracker,
+  meta_stack_tracker_record_add (window->display->stack_tracker,
                                  frame->xwindow,
                                  create_serial);
 
@@ -98,7 +98,7 @@ meta_window_ensure_frame (MetaWindow *window)
       window->unmaps_pending += 1;
     }
 
-  meta_stack_tracker_record_remove (window->screen->stack_tracker,
+  meta_stack_tracker_record_remove (window->display->stack_tracker,
                                     window->xwindow,
                                     XNextRequest (XDISPLAY(window)));
   XReparentWindow (XDISPLAY(window),
@@ -182,7 +182,7 @@ meta_window_destroy_frame (MetaWindow *window)
                   "Incrementing unmaps_pending on %s for reparent back to root\n", window->desc);
       window->unmaps_pending += 1;
     }
-  meta_stack_tracker_record_add (window->screen->stack_tracker,
+  meta_stack_tracker_record_add (window->display->stack_tracker,
                                  window->xwindow,
                                  XNextRequest (XDISPLAY(window)));
   XReparentWindow (XDISPLAY(window),
@@ -381,7 +381,7 @@ meta_frame_set_screen_cursor (MetaFrame	*frame,
     XUndefineCursor (XDISPLAY(frame->window), frame->xwindow);
   else
     {
-      xcursor = meta_display_create_x_cursor (frame->window->display, cursor);
+      xcursor = meta_cursor_create_x_cursor (XDISPLAY(frame->window), cursor);
       XDefineCursor (XDISPLAY(frame->window), frame->xwindow, xcursor);
       XFlush (XDISPLAY(frame->window));
       XFreeCursor (XDISPLAY(frame->window), xcursor);

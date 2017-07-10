@@ -37,6 +37,7 @@
 #include "keybindings-private.h"
 #include "startup-notification-private.h"
 #include "meta-gesture-tracker-private.h"
+#include "stack-tracker.h"
 #include <meta/prefs.h>
 #include <meta/barrier.h>
 #include <clutter/clutter.h>
@@ -51,6 +52,9 @@ typedef struct _MetaStack      MetaStack;
 typedef struct _MetaUISlave    MetaUISlave;
 
 typedef struct MetaEdgeResistanceData MetaEdgeResistanceData;
+
+typedef void (* MetaDisplayWindowFunc) (MetaWindow *window,
+                                        gpointer    user_data);
 
 typedef enum {
   META_LIST_DEFAULT                   = 0,      /* normal windows */
@@ -221,11 +225,23 @@ struct _MetaDisplay
   ClutterActor *current_pad_osd;
 
   MetaStartupNotification *startup_notification;
+
+  MetaCursor current_cursor;
+  MetaRectangle rect; /* Size of screen; rect.x & rect.y are always 0 */
+
+  MetaStack *stack;
+  MetaStackTracker *stack_tracker;
+
+  guint check_fullscreen_later;
 };
 
 struct _MetaDisplayClass
 {
   GObjectClass parent_class;
+
+  void (*monitors_changed)  (MetaDisplay *);
+  void (*restacked)         (MetaDisplay *);
+  void (*workareas_changed) (MetaDisplay *);
 };
 
 #define XSERVER_TIME_IS_BEFORE_ASSUMING_REAL_TIMESTAMPS(time1, time2) \
@@ -292,9 +308,7 @@ GSList*     meta_display_list_windows        (MetaDisplay          *display,
 MetaDisplay* meta_display_for_x_display  (Display     *xdisplay);
 MetaDisplay* meta_get_display            (void);
 
-Cursor         meta_display_create_x_cursor (MetaDisplay *display,
-                                             MetaCursor   cursor);
-
+void     meta_display_reload_cursor (MetaDisplay *display);
 void     meta_display_update_cursor (MetaDisplay *display);
 
 void    meta_display_check_threshold_reached (MetaDisplay *display,
@@ -395,5 +409,13 @@ void meta_display_notify_pad_group_switch (MetaDisplay        *display,
                                            guint               n_group,
                                            guint               n_mode,
                                            guint               n_modes);
+
+void meta_display_foreach_window (MetaDisplay          *display,
+                                  MetaListWindowsFlags  flags,
+                                  MetaDisplayWindowFunc func,
+                                  gpointer              data);
+
+void meta_display_queue_check_fullscreen (MetaDisplay *display);
+void meta_display_restacked              (MetaDisplay *display);
 
 #endif

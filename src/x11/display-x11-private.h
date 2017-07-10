@@ -36,6 +36,7 @@
 #include <meta/types.h>
 
 #include "display-private.h"
+#include "meta-monitor-manager-private.h"
 
 #include <x11/display-x11.h>
 
@@ -92,10 +93,17 @@ struct _MetaX11Display
   /* last timestamp passed to XSetInputFocus */
   guint32 last_focus_time;
 
+  /* Instead of unmapping withdrawn windows we can leave them mapped
+   * and restack them below a guard window. When using a compositor
+   * this allows us to provide live previews of unmapped windows */
+  Window guard_window;
+
   Window wm_cm_selection_window;
   Window wm_sn_selection_window;
   Atom wm_sn_atom;
   guint32 wm_sn_timestamp;
+
+  gboolean has_xinerama_indices;
 
   GHashTable *xids;
 
@@ -198,5 +206,14 @@ void meta_x11_display_increment_event_serial (MetaX11Display *display);
 Window meta_create_offscreen_window (Display *xdisplay,
                                      Window   parent,
                                      long     valuemask);
+
+void meta_x11_display_create_guard_window (MetaX11Display *x11_display);
+void meta_x11_display_update_cursor       (MetaX11Display *x11_display);
+
+int meta_x11_display_logical_monitor_to_xinerama_index (MetaX11Display     *x11_display,
+                                                        MetaLogicalMonitor *logical_monitor);
+
+MetaLogicalMonitor *meta_x11_display_xinerama_index_to_logical_monitor (MetaX11Display *x11_display,
+                                                                        int             xinerama_index);
 
 #endif

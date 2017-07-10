@@ -21,6 +21,7 @@
 
 #include <config.h>
 
+#include <meta/display.h>
 #include <meta/meta-plugin.h>
 #include <meta/window.h>
 #include <meta/meta-background-group.h>
@@ -378,7 +379,7 @@ start (MetaPlugin *plugin)
   clutter_actor_insert_child_below (meta_get_window_group_for_screen (screen),
                                     self->priv->background_group, NULL);
 
-  g_signal_connect (screen, "monitors-changed",
+  g_signal_connect (meta_screen_get_display (screen), "monitors-changed",
                     G_CALLBACK (on_monitors_changed), plugin);
   on_monitors_changed (screen, plugin);
 
@@ -401,9 +402,9 @@ switch_workspace (MetaPlugin *plugin,
   screen = meta_plugin_get_screen (plugin);
   stage = meta_get_stage_for_screen (screen);
 
-  meta_screen_get_size (screen,
-                        &screen_width,
-                        &screen_height);
+  meta_display_get_size (meta_screen_get_display(screen),
+                         &screen_width,
+                         &screen_height);
 
   clutter_actor_set_pivot_point (workspace1, 1.0, 1.0);
   clutter_actor_set_position (workspace1,

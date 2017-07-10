@@ -134,6 +134,9 @@ enum
   SHOW_PAD_OSD,
   SHOW_OSD,
   PAD_MODE_SWITCH,
+  IN_FULLSCREEN_CHANGED,
+  MONITORS_CHANGED,
+  RESTACKED,
   LAST_SIGNAL
 };
 
@@ -155,6 +158,9 @@ static MetaDisplay *the_display = NULL;
 
 static int mru_cmp (gconstpointer a,
                     gconstpointer b);
+
+static void on_monitors_changed (MetaMonitorManager *manager,
+                                 MetaDisplay        *display);
 
 static void
 meta_display_get_property(GObject         *object,
@@ -386,6 +392,30 @@ meta_display_class_init (MetaDisplayClass *klass)
                   G_TYPE_NONE, 3, CLUTTER_TYPE_INPUT_DEVICE,
                   G_TYPE_UINT, G_TYPE_UINT);
 
+  display_signals[IN_FULLSCREEN_CHANGED] =
+    g_signal_new ("in-fullscreen-changed",
+		  G_TYPE_FROM_CLASS (klass),
+		  G_SIGNAL_RUN_LAST,
+                  0,
+                  NULL, NULL, NULL,
+		  G_TYPE_NONE, 0);
+
+  display_signals[MONITORS_CHANGED] =
+    g_signal_new ("monitors-changed",
+		  G_TYPE_FROM_CLASS (klass),
+		  G_SIGNAL_RUN_LAST,
+		  G_STRUCT_OFFSET (MetaDisplayClass, monitors_changed),
+                  NULL, NULL, NULL,
+		  G_TYPE_NONE, 0);
+
+  display_signals[RESTACKED] =
+    g_signal_new ("restacked",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  G_STRUCT_OFFSET (MetaDisplayClass, restacked),
+                  NULL, NULL, NULL,
+                  G_TYPE_NONE, 0);
+
   g_object_class_install_property (object_class,
                                    PROP_FOCUS_WINDOW,
                                    g_param_spec_object ("focus-window",
@@ -553,6 +583,7 @@ meta_display_open (void)
   int i;
   guint32 timestamp;
   Window old_active_xwindow = None;
+  MetaMonitorManager *manager;
 
   g_assert (the_display == NULL);
   display = the_display = g_object_new (META_TYPE_DISPLAY, NULL);
@@ -601,6 +632,18 @@ meta_display_open (void)
 
   display->grab_edge_resistance_data = NULL;
 
+  display->rect.x = display->rect.y = 0;
+  display->current_cursor = -1; /* invalid/unset */
+  display->check_fullscreen_later = 0;
+
+  manager = meta_monitor_manager_get ();
+  g_signal_connect (manager, "monitors-changed",
+                    G_CALLBACK (on_monitors_changed), display);
+
+  meta_monitor_manager_get_screen_size (manager,
+                                        &display->rect.width,
+                                        &display->rect.height);
+
   meta_x11_display_open (display);
   g_assert (display->x11_display != NULL);
 
@@ -608,6 +651,13 @@ meta_display_open (void)
 
   display->last_user_time = timestamp;
   display->compositor = NULL;
+
+  display->stack = meta_stack_new (display);
+  display->stack_tracker = meta_stack_tracker_new (display);
+
+  meta_display_set_cursor (display, META_CURSOR_DEFAULT);
+
+  meta_x11_display_create_guard_window (display->x11_display);
 
   /* Mutter used to manage all X screens of the display in a single process, but
    * now it always manages exactly one screen - the default screen retrieved
@@ -642,8 +692,6 @@ meta_display_open (void)
 
   enable_compositor (display);
 
-  meta_screen_create_guard_window (screen);
-
   /* Set up touch support */
   display->gesture_tracker = meta_gesture_tracker_new ();
   g_signal_connect (display->gesture_tracker, "state-changed",
@@ -653,7 +701,7 @@ meta_display_open (void)
    * we start out with no windows.
    */
   if (!meta_is_wayland_compositor ())
-    meta_screen_manage_all_windows (screen);
+    meta_display_manage_all_windows (display);
 
   if (old_active_xwindow != None)
     {
@@ -802,6 +850,12 @@ meta_display_close (MetaDisplay *display,
 
   /* Stop caring about events */
   meta_display_free_events (display);
+
+  meta_stack_free (display->stack);
+  meta_stack_tracker_free (display->stack_tracker);
+
+  if (display->check_fullscreen_later != 0)
+    meta_later_remove (display->check_fullscreen_later);
 
   if (display->screen)
     meta_screen_free (display->screen, timestamp);
@@ -1020,7 +1074,7 @@ window_raise_with_delay_callback (void *data)
   /* If we aren't already on top, check whether the pointer is inside
    * the window and raise the window if so.
    */
-  if (meta_stack_get_top (window->screen->stack) != window)
+  if (meta_stack_get_top (window->display->stack) != window)
     {
       if (meta_window_has_pointer (window))
 	meta_window_raise (window);
@@ -1268,10 +1322,120 @@ meta_cursor_for_grab_op (MetaGrabOp op)
   return META_CURSOR_DEFAULT;
 }
 
+static int
+find_highest_logical_monitor_scale (MetaBackend      *backend,
+                                    MetaCursorSprite *cursor_sprite)
+{
+  MetaMonitorManager *monitor_manager =
+    meta_backend_get_monitor_manager (backend);
+  MetaCursorRenderer *cursor_renderer =
+    meta_backend_get_cursor_renderer (backend);
+  MetaRectangle cursor_rect;
+  GList *logical_monitors;
+  GList *l;
+  int highest_scale = 0.0;
+
+  cursor_rect = meta_cursor_renderer_calculate_rect (cursor_renderer,
+                                                     cursor_sprite);
+
+  logical_monitors =
+    meta_monitor_manager_get_logical_monitors (monitor_manager);
+  for (l = logical_monitors; l; l = l->next)
+    {
+      MetaLogicalMonitor *logical_monitor = l->data;
+
+      if (!meta_rectangle_overlap (&cursor_rect, &logical_monitor->rect))
+        continue;
+
+      highest_scale = MAX (highest_scale, logical_monitor->scale);
+    }
+
+  return highest_scale;
+}
+
+static void
+root_cursor_prepare_at (MetaCursorSprite *cursor_sprite,
+                        int               x,
+                        int               y,
+                        MetaDisplay      *display)
+{
+  MetaBackend *backend = meta_get_backend ();
+
+  if (meta_is_stage_views_scaled ())
+    {
+      int scale;
+
+      scale = find_highest_logical_monitor_scale (backend, cursor_sprite);
+      if (scale != 0.0)
+        {
+          meta_cursor_sprite_set_theme_scale (cursor_sprite, scale);
+          meta_cursor_sprite_set_texture_scale (cursor_sprite, 1.0 / scale);
+        }
+    }
+  else
+    {
+      MetaMonitorManager *monitor_manager =
+        meta_backend_get_monitor_manager (backend);
+      MetaLogicalMonitor *logical_monitor;
+
+      logical_monitor =
+        meta_monitor_manager_get_logical_monitor_at (monitor_manager, x, y);
+
+      /* Reload the cursor texture if the scale has changed. */
+      if (logical_monitor)
+        {
+          meta_cursor_sprite_set_theme_scale (cursor_sprite,
+                                              logical_monitor->scale);
+          meta_cursor_sprite_set_texture_scale (cursor_sprite, 1.0);
+        }
+    }
+}
+
+static void
+manage_root_cursor_sprite_scale (MetaDisplay      *display,
+                                 MetaCursorSprite *cursor_sprite)
+{
+  g_signal_connect_object (cursor_sprite,
+                           "prepare-at",
+                           G_CALLBACK (root_cursor_prepare_at),
+                           display,
+                           0);
+}
+
 void
 meta_display_update_cursor (MetaDisplay *display)
 {
-  meta_screen_set_cursor (display->screen, meta_cursor_for_grab_op (display->grab_op));
+  meta_display_set_cursor (display, meta_cursor_for_grab_op (display->grab_op));
+}
+
+void
+meta_display_reload_cursor (MetaDisplay *display)
+{
+  MetaCursor cursor = display->current_cursor;
+  MetaCursorSprite *cursor_sprite;
+  MetaBackend *backend = meta_get_backend ();
+  MetaCursorTracker *cursor_tracker = meta_backend_get_cursor_tracker (backend);
+
+  cursor_sprite = meta_cursor_sprite_from_theme (cursor);
+
+  if (meta_is_wayland_compositor ())
+    manage_root_cursor_sprite_scale (display, cursor_sprite);
+
+  meta_cursor_tracker_set_root_cursor (cursor_tracker, cursor_sprite);
+  g_object_unref (cursor_sprite);
+
+  meta_x11_display_update_cursor (display->x11_display);
+}
+
+void
+meta_display_set_cursor (MetaDisplay *display,
+                         MetaCursor   cursor)
+{
+  if (cursor == display->current_cursor)
+    return;
+
+  display->current_cursor = cursor;
+  meta_display_reload_cursor (display);
 }
 
 static MetaWindow *
@@ -2153,7 +2317,7 @@ meta_display_stack_cmp (const void *a,
   MetaWindow *aw = (void*) a;
   MetaWindow *bw = (void*) b;
 
-  return meta_stack_windows_cmp (aw->screen->stack, aw, bw);
+  return meta_stack_windows_cmp (aw->display->stack, aw, bw);
 }
 
 /**
@@ -2382,13 +2546,6 @@ void
 meta_display_clear_mouse_mode (MetaDisplay *display)
 {
   display->mouse_mode = FALSE;
-}
-
-Cursor
-meta_display_create_x_cursor (MetaDisplay *display,
-                              MetaCursor   cursor)
-{
-  return meta_cursor_create_x_cursor (display->x11_display->xdisplay, cursor);
 }
 
 MetaGestureTracker *
@@ -2631,4 +2788,230 @@ meta_display_notify_pad_group_switch (MetaDisplay        *display,
                  n_group, n_mode);
 
   g_string_free (message, TRUE);
+}
+
+/**
+ * meta_display_get_size:
+ * @display: A #MetaDisplay
+ * @width: (out): The width of the primary screen
+ * @height: (out): The height of the primary screen
+ *
+ * Retrieve the size of the primary screen.
+ */
+void
+meta_display_get_size (MetaDisplay *display,
+                       int         *width,
+                       int         *height)
+{
+  if (width != NULL)
+    *width = display->rect.width;
+
+  if (height != NULL)
+    *height = display->rect.height;
+}
+
+static void
+meta_display_resize_func (MetaWindow *window,
+                          gpointer    user_data)
+{
+  if (window->struts)
+    {
+      meta_window_update_struts (window);
+    }
+  meta_window_queue (window, META_QUEUE_MOVE_RESIZE);
+
+  meta_window_recalc_features (window);
+}
+
+void
+meta_display_foreach_window (MetaDisplay          *display,
+                             MetaListWindowsFlags  flags,
+                             MetaDisplayWindowFunc func,
+                             gpointer              data)
+{
+  GSList *windows;
+
+  /* If we end up doing this often, just keeping a list
+   * of windows might be sensible.
+   */
+
+  windows = meta_display_list_windows (display, flags);
+
+  g_slist_foreach (windows, (GFunc) func, data);
+
+  g_slist_free (windows);
+}
+
+static void
+on_monitors_changed (MetaMonitorManager *manager,
+                     MetaDisplay        *display)
+{
+  MetaBackend *backend;
+  MetaCursorRenderer *cursor_renderer;
+
+  meta_monitor_manager_get_screen_size (manager,
+                                        &display->rect.width,
+                                        &display->rect.height);
+
+  /* Fix up monitor for all windows on this screen */
+  meta_display_foreach_window (display, META_LIST_INCLUDE_OVERRIDE_REDIRECT,
+			       (MetaDisplayWindowFunc) meta_window_update_for_monitors_changed, 0);
+
+  /* Queue a resize on all the windows */
+  meta_display_foreach_window (display, META_LIST_DEFAULT, meta_display_resize_func, 0);
+
+  meta_display_queue_check_fullscreen (display);
+
+  backend = meta_get_backend ();
+  cursor_renderer = meta_backend_get_cursor_renderer (backend);
+  meta_cursor_renderer_force_update (cursor_renderer);
+
+  g_signal_emit (display, display_signals[MONITORS_CHANGED], 0);
+}
+
+static gboolean
+check_fullscreen_func (gpointer data)
+{
+  MetaDisplay *display = data;
+  MetaBackend *backend = meta_get_backend ();
+  MetaMonitorManager *monitor_manager =
+    meta_backend_get_monitor_manager (backend);
+  GList *logical_monitors, *l;
+  MetaWindow *window;
+  GSList *fullscreen_monitors = NULL;
+  GSList *obscured_monitors = NULL;
+  gboolean in_fullscreen_changed = FALSE;
+
+  display->check_fullscreen_later = 0;
+
+  logical_monitors =
+    meta_monitor_manager_get_logical_monitors (monitor_manager);
+
+  /* We consider a monitor in fullscreen if it contains a fullscreen window;
+   * however we make an exception for maximized windows above the fullscreen
+   * one, as in that case window+chrome fully obscure the fullscreen window.
+   */
+  for (window = meta_stack_get_top (display->stack);
+       window;
+       window = meta_stack_get_below (display->stack, window, FALSE))
+    {
+      gboolean covers_monitors = FALSE;
+
+      if (window->hidden)
+        continue;
+
+      if (window->fullscreen)
+        {
+          covers_monitors = TRUE;
+        }
+      else if (window->override_redirect)
+        {
+          /* We want to handle the case where an application is creating an
+           * override-redirect window the size of the screen (monitor) and treat
+           * it similarly to a fullscreen window, though it doesn't have fullscreen
+           * window management behavior. (Being O-R, it's not managed at all.)
+           */
+          if (meta_window_is_monitor_sized (window))
+            covers_monitors = TRUE;
+        }
+      else if (window->maximized_horizontally &&
+               window->maximized_vertically)
+        {
+          MetaLogicalMonitor *logical_monitor;
+
+          logical_monitor = meta_window_get_main_logical_monitor (window);
+          if (!g_slist_find (obscured_monitors, logical_monitor))
+            obscured_monitors = g_slist_prepend (obscured_monitors,
+                                                 logical_monitor);
+        }
+
+      if (covers_monitors)
+        {
+          MetaRectangle window_rect;
+
+          meta_window_get_frame_rect (window, &window_rect);
+
+          for (l = logical_monitors; l; l = l->next)
+            {
+              MetaLogicalMonitor *logical_monitor = l->data;
+
+              if (meta_rectangle_overlap (&window_rect,
+                                          &logical_monitor->rect) &&
+                  !g_slist_find (fullscreen_monitors, logical_monitor) &&
+                  !g_slist_find (obscured_monitors, logical_monitor))
+                fullscreen_monitors = g_slist_prepend (fullscreen_monitors,
+                                                       logical_monitor);
+            }
+        }
+    }
+
+  g_slist_free (obscured_monitors);
+
+  for (l = logical_monitors; l; l = l->next)
+    {
+      MetaLogicalMonitor *logical_monitor = l->data;
+      gboolean in_fullscreen;
+
+      in_fullscreen = g_slist_find (fullscreen_monitors,
+                                    logical_monitor) != NULL;
+      if (in_fullscreen != logical_monitor->in_fullscreen)
+        {
+          logical_monitor->in_fullscreen = in_fullscreen;
+          in_fullscreen_changed = TRUE;
+        }
+    }
+
+  g_slist_free (fullscreen_monitors);
+
+  if (in_fullscreen_changed)
+    {
+      /* DOCK window stacking depends on the monitor's fullscreen
+         status so we need to trigger a re-layering. */
+      MetaWindow *window = meta_stack_get_top (display->stack);
+      if (window)
+        meta_stack_update_layer (display->stack, window);
+
+      g_signal_emit (display, display_signals[IN_FULLSCREEN_CHANGED], 0, NULL);
+    }
+
+  return FALSE;
+}
+
+void
+meta_display_queue_check_fullscreen (MetaDisplay *display)
+{
+  if (!display->check_fullscreen_later)
+    display->check_fullscreen_later = meta_later_add (META_LATER_CHECK_FULLSCREEN,
+                                                      check_fullscreen_func,
+                                                      display, NULL);
+}
+
+void
+meta_display_restacked (MetaDisplay *display)
+{
+  g_signal_emit (display, display_signals[RESTACKED], 0);
+}
+
+void
+meta_display_manage_all_windows (MetaDisplay *display)
+{
+  guint64 *_children;
+  guint64 *children;
+  int n_children, i;
+
+  meta_stack_freeze (display->stack);
+  meta_stack_tracker_get_stack (display->stack_tracker, &_children, &n_children);
+
+  /* Copy the stack as it will be modified as part of the loop */
+  children = g_memdup (_children, sizeof (guint64) * n_children);
+
+  for (i = 0; i < n_children; ++i)
+    {
+      g_assert (META_STACK_ID_IS_X11 (children[i]));
+      meta_window_x11_new (display, children[i], TRUE,
+                           META_COMP_EFFECT_NONE);
+    }
+
+  g_free (children);
+  meta_stack_thaw (display->stack);
 }

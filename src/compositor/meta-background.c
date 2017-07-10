@@ -17,6 +17,7 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <meta/display.h>
 #include <meta/util.h>
 #include <meta/meta-background.h>
 #include <meta/meta-background-image.h>
@@ -167,8 +168,10 @@ set_screen (MetaBackground *self,
 
   if (priv->screen != NULL)
     {
-      g_signal_connect (priv->screen, "monitors-changed",
-                        G_CALLBACK (on_monitors_changed), self);
+      g_signal_connect (meta_screen_get_display (priv->screen),
+                        "monitors-changed",
+                        G_CALLBACK (on_monitors_changed),
+                        self);
     }
 
   on_monitors_changed (priv->screen, self);
@@ -407,7 +410,8 @@ get_texture_area (MetaBackground          *self,
       set_texture_area_from_monitor_area (monitor_rect, texture_area);
       break;
     case G_DESKTOP_BACKGROUND_STYLE_WALLPAPER:
-      meta_screen_get_size (priv->screen, &screen_width, &screen_height);
+      meta_display_get_size (meta_screen_get_display (priv->screen),
+                             &screen_width, &screen_height);
 
       /* Start off by centering a tile in the middle of the
        * total screen area.
@@ -476,7 +480,8 @@ get_texture_area (MetaBackground          *self,
         /* paint region is the union of all monitors, with the origin
          * of the region set to align with monitor associated with the background.
          */
-        meta_screen_get_size (priv->screen, &screen_width, &screen_height);
+        meta_display_get_size (meta_screen_get_display (priv->screen),
+                               &screen_width, &screen_height);
 
         /* unclipped texture area is whole screen */
         image_area.width = screen_width;

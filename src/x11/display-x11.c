@@ -37,6 +37,7 @@
 #include "frame.h"
 #include "util-private.h"
 
+#include "backends/meta-logical-monitor.h"
 #include "backends/x11/meta-backend-x11.h"
 
 #include <meta/errors.h>
@@ -51,6 +52,7 @@
 #include <X11/extensions/Xcomposite.h>
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xfixes.h>
+#include <X11/extensions/Xinerama.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -68,6 +70,13 @@
 
 G_DEFINE_TYPE(MetaX11Display, meta_x11_display, G_TYPE_OBJECT);
 
+static GQuark quark_x11_display_logical_monitor_data = 0;
+
+typedef struct _MetaX11DisplayLogicalMonitorData
+{
+  int xinerama_index;
+} MetaX11DisplayLogicalMonitorData;
+
 static const char *gnome_wm_keybindings = "Mutter";
 static const char *net_wm_name = "Mutter";
 
@@ -78,6 +87,79 @@ static void prefs_changed_callback (MetaPreference pref,
 
 static char* get_screen_name (Display *xdisplay,
                               int      number);
+
+static void on_monitors_changed (MetaDisplay    *display,
+                                 MetaX11Display *x11_display);
+
+/* The guard window allows us to leave minimized windows mapped so
+ * that compositor code may provide live previews of them.
+ * Instead of being unmapped/withdrawn, they get pushed underneath
+ * the guard window. We also select events on the guard window, which
+ * should effectively be forwarded to events on the background actor,
+ * providing that the scene graph is set up correctly.
+ */
+static Window
+create_guard_window (MetaX11Display *x11_display)
+{
+  MetaDisplay *display = x11_display->display;
+  Display *xdisplay = x11_display->xdisplay;
+  XSetWindowAttributes attributes;
+  Window guard_window;
+  gulong create_serial;
+
+  attributes.event_mask = NoEventMask;
+  attributes.override_redirect = True;
+
+  /* We have to call record_add() after we have the new window ID,
+   * so save the serial for the CreateWindow request until then */
+  create_serial = XNextRequest(xdisplay);
+  guard_window =
+    XCreateWindow (xdisplay,
+		   x11_display->xroot,
+		   0, /* x */
+		   0, /* y */
+		   display->rect.width,
+		   display->rect.height,
+		   0, /* border width */
+		   0, /* depth */
+		   InputOnly, /* class */
+		   CopyFromParent, /* visual */
+		   CWEventMask|CWOverrideRedirect,
+		   &attributes);
+
+  /* https://bugzilla.gnome.org/show_bug.cgi?id=710346 */
+  XStoreName (xdisplay, guard_window, "mutter guard window");
+
+  {
+    if (!meta_is_wayland_compositor ())
+      {
+        MetaBackendX11 *backend = META_BACKEND_X11 (meta_get_backend ());
+        Display *backend_xdisplay = meta_backend_x11_get_xdisplay (backend);
+        unsigned char mask_bits[XIMaskLen (XI_LASTEVENT)] = { 0 };
+        XIEventMask mask = { XIAllMasterDevices, sizeof (mask_bits), mask_bits };
+
+        XISetMask (mask.mask, XI_ButtonPress);
+        XISetMask (mask.mask, XI_ButtonRelease);
+        XISetMask (mask.mask, XI_Motion);
+
+        /* Sync on the connection we created the window on to
+         * make sure it's created before we select on it on the
+         * backend connection. */
+        XSync (xdisplay, False);
+
+        XISelectEvents (backend_xdisplay, guard_window, &mask, 1);
+      }
+  }
+
+  meta_stack_tracker_record_add (display->stack_tracker,
+                                 guard_window,
+                                 create_serial);
+
+  meta_stack_tracker_lower (display->stack_tracker,
+                            guard_window);
+  XMapWindow (xdisplay, guard_window);
+  return guard_window;
+}
 
 static Window
 take_manager_selection (MetaX11Display *x11_display,
@@ -187,6 +269,8 @@ meta_set_gnome_wm_keybindings (const char *wm_keybindings)
 static void
 meta_x11_display_class_init (MetaX11DisplayClass *klass)
 {
+  quark_x11_display_logical_monitor_data =
+    g_quark_from_static_string ("-meta-x11-display-logical-monitor-data");
 }
 
 static void
@@ -295,6 +379,8 @@ meta_x11_display_open (MetaDisplay *display)
   meta_display_init_window_prop_hooks (x11_display);
   x11_display->group_prop_hooks = NULL;
   meta_display_init_group_prop_hooks (x11_display);
+
+  x11_display->guard_window = None;
 
   /* Offscreen unmapped window used for _NET_SUPPORTING_WM_CHECK,
    * created in screen_new
@@ -595,6 +681,9 @@ meta_x11_display_open (MetaDisplay *display)
   if (!meta_is_wayland_compositor ())
     x11_display->composite_overlay_window = XCompositeGetOverlayWindow (xdisplay, xroot);
 
+  g_signal_connect (display, "monitors-changed",
+                    G_CALLBACK (on_monitors_changed), x11_display);
+
   return TRUE;
 }
 
@@ -824,8 +913,7 @@ update_cursor_theme (void)
 
     set_cursor_theme (x11_display->xdisplay);
 
-    if (display->screen)
-      meta_screen_update_cursor (display->screen);
+    meta_display_update_cursor (display);
   }
 
   {
@@ -1054,4 +1142,168 @@ meta_x11_display_xwindow_is_a_no_focus_window (MetaX11Display *x11_display,
                                                Window xwindow)
 {
   return x11_display ? xwindow == x11_display->no_focus_window : FALSE;
+}
+
+void
+meta_x11_display_create_guard_window (MetaX11Display *x11_display)
+{
+  if (x11_display->guard_window == None)
+    x11_display->guard_window = create_guard_window (x11_display);
+}
+
+void
+meta_x11_display_update_cursor (MetaX11Display *x11_display)
+{
+  MetaCursor cursor = x11_display->display->current_cursor;
+  Cursor xcursor;
+
+  /* Set a cursor for X11 applications that don't specify their own */
+  xcursor = meta_cursor_create_x_cursor (x11_display->xdisplay, cursor);
+
+  XDefineCursor (x11_display->xdisplay, x11_display->xroot, xcursor);
+  XFlush (x11_display->xdisplay);
+  XFreeCursor (x11_display->xdisplay, xcursor);
+}
+
+static void
+on_monitors_changed (MetaDisplay    *display,
+                     MetaX11Display *x11_display)
+{
+  /* Resize the guard window to fill the screen again. */
+  if (x11_display->guard_window != None)
+    {
+      XWindowChanges changes;
+
+      changes.x = 0;
+      changes.y = 0;
+      changes.width = display->rect.width;
+      changes.height = display->rect.height;
+
+      XConfigureWindow(x11_display->xdisplay,
+                       x11_display->guard_window,
+                       CWX | CWY | CWWidth | CWHeight,
+                       &changes);
+    }
+
+  x11_display->has_xinerama_indices = FALSE;
+}
+
+static MetaX11DisplayLogicalMonitorData *
+get_x11_display_logical_monitor_data (MetaLogicalMonitor *logical_monitor)
+{
+  return g_object_get_qdata (G_OBJECT (logical_monitor),
+                             quark_x11_display_logical_monitor_data);
+}
+
+static MetaX11DisplayLogicalMonitorData *
+ensure_x11_display_logical_monitor_data (MetaLogicalMonitor *logical_monitor)
+{
+  MetaX11DisplayLogicalMonitorData *data;
+
+  data = get_x11_display_logical_monitor_data (logical_monitor);
+  if (data)
+    return data;
+
+  data = g_new0 (MetaX11DisplayLogicalMonitorData, 1);
+  g_object_set_qdata_full (G_OBJECT (logical_monitor),
+                           quark_x11_display_logical_monitor_data,
+                           data,
+                           g_free);
+
+  return data;
+}
+
+static void
+meta_x11_display_ensure_xinerama_indices (MetaX11Display *x11_display)
+{
+  MetaBackend *backend = meta_get_backend ();
+  MetaMonitorManager *monitor_manager =
+    meta_backend_get_monitor_manager (backend);
+  GList *logical_monitors, *l;
+  XineramaScreenInfo *infos;
+  int n_infos, j;
+
+  if (x11_display->has_xinerama_indices)
+    return;
+
+  x11_display->has_xinerama_indices = TRUE;
+
+  if (!XineramaIsActive (x11_display->xdisplay))
+    return;
+
+  infos = XineramaQueryScreens (x11_display->xdisplay, &n_infos);
+  if (n_infos <= 0 || infos == NULL)
+    {
+      meta_XFree (infos);
+      return;
+    }
+
+  logical_monitors =
+    meta_monitor_manager_get_logical_monitors (monitor_manager);
+
+  for (l = logical_monitors; l; l = l->next)
+    {
+      MetaLogicalMonitor *logical_monitor = l->data;
+
+      for (j = 0; j < n_infos; ++j)
+        {
+          if (logical_monitor->rect.x == infos[j].x_org &&
+              logical_monitor->rect.y == infos[j].y_org &&
+              logical_monitor->rect.width == infos[j].width &&
+              logical_monitor->rect.height == infos[j].height)
+            {
+              MetaX11DisplayLogicalMonitorData *logical_monitor_data;
+
+              logical_monitor_data =
+                ensure_x11_display_logical_monitor_data (logical_monitor);
+              logical_monitor_data->xinerama_index = j;
+            }
+        }
+    }
+
+  meta_XFree (infos);
+}
+
+int
+meta_x11_display_logical_monitor_to_xinerama_index (MetaX11Display     *x11_display,
+                                                    MetaLogicalMonitor *logical_monitor)
+{
+  MetaX11DisplayLogicalMonitorData *logical_monitor_data;
+
+  g_return_val_if_fail (logical_monitor, -1);
+
+  meta_x11_display_ensure_xinerama_indices (x11_display);
+
+  logical_monitor_data = get_x11_display_logical_monitor_data (logical_monitor);
+
+  return logical_monitor_data->xinerama_index;
+}
+
+MetaLogicalMonitor *
+meta_x11_display_xinerama_index_to_logical_monitor (MetaX11Display *x11_display,
+                                                    int             xinerama_index)
+{
+  MetaBackend *backend = meta_get_backend ();
+  MetaMonitorManager *monitor_manager =
+    meta_backend_get_monitor_manager (backend);
+  GList *logical_monitors, *l;
+
+  meta_x11_display_ensure_xinerama_indices (x11_display);
+
+  logical_monitors =
+    meta_monitor_manager_get_logical_monitors (monitor_manager);
+
+  for (l = logical_monitors; l; l = l->next)
+    {
+      MetaLogicalMonitor *logical_monitor = l->data;
+      MetaX11DisplayLogicalMonitorData *logical_monitor_data;
+
+      logical_monitor_data =
+        ensure_x11_display_logical_monitor_data (logical_monitor);
+
+      if (logical_monitor_data->xinerama_index == xinerama_index)
+        return logical_monitor;
+    }
+
+  return NULL;
 }
