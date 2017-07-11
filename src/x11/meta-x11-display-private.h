@@ -26,6 +26,7 @@
 #define META_X11_DISPLAY_PRIVATE_H
 
 #include <glib.h>
+#include <X11/Xlib.h>
 
 #include "core/display-private.h"
 #include "meta/common.h"
@@ -37,9 +38,31 @@ struct _MetaX11Display
   GObject parent;
 
   MetaDisplay *display;
+
+  char *name;
+  char *screen_name;
+
+  Display *xdisplay;
+  Window xroot;
+  int default_depth;
+  Visual *default_xvisual;
+
+  /* Pull in all the names of atoms as fields; we will intern them when the
+   * class is constructed.
+   */
+#define item(x)  Atom atom_##x;
+#include <x11/atomnames.h>
+#undef item
 };
 
 MetaX11Display *meta_x11_display_open  (MetaDisplay    *display);
 void            meta_x11_display_close (MetaX11Display *x11_display);
+
+Window meta_create_offscreen_window (Display *xdisplay,
+                                     Window   parent,
+                                     long     valuemask);
+
+Cursor meta_x11_display_create_x_cursor (MetaX11Display *x11_display,
+                                         MetaCursor      cursor);
 
 #endif /* META_X11_DISPLAY_PRIVATE_H */
