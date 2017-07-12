@@ -697,9 +697,6 @@ meta_display_open (void)
 
   meta_display_init_events_x11 (display);
 
-  display->xids = g_hash_table_new (meta_unsigned_long_hash,
-                                        meta_unsigned_long_equal);
-
   /* Create the leader window here. Set its properties and
    * use the timestamp from one of the PropertyNotify events
    * that will follow.
@@ -814,7 +811,9 @@ meta_display_open (void)
 
   if (old_active_xwindow != None)
     {
-      MetaWindow *old_active_window = meta_display_lookup_x_window (display, old_active_xwindow);
+      MetaWindow *old_active_window;
+      old_active_window = meta_x11_display_lookup_x_window (display->x11_display,
+                                                            old_active_xwindow);
       if (old_active_window)
         meta_window_focus (old_active_window, timestamp);
       else
@@ -865,7 +864,7 @@ meta_display_list_windows (MetaDisplay          *display,
 
   winlist = NULL;
 
-  g_hash_table_iter_init (&iter, display->xids);
+  g_hash_table_iter_init (&iter, display->x11_display->xids);
   while (g_hash_table_iter_next (&iter, &key, &value))
     {
       MetaWindow *window = value;
@@ -982,11 +981,6 @@ meta_display_close (MetaDisplay *display,
 
   /* Stop caring about events */
   meta_display_free_events_x11 (display);
-
-  /* Must be after all calls to meta_window_unmanage() since they
-   * unregister windows
-   */
-  g_hash_table_destroy (display->xids);
 
   if (display->leader_window != None)
     XDestroyWindow (display->x11_display->xdisplay, display->leader_window);
@@ -1421,32 +1415,6 @@ request_xserver_input_focus_change (MetaDisplay *display,
     meta_display_remove_autoraise_callback (display);
 }
 
-MetaWindow*
-meta_display_lookup_x_window (MetaDisplay *display,
-                              Window       xwindow)
-{
-  return g_hash_table_lookup (display->xids, &xwindow);
-}
-
-void
-meta_display_register_x_window (MetaDisplay *display,
-                                Window      *xwindowp,
-                                MetaWindow  *window)
-{
-  g_return_if_fail (g_hash_table_lookup (display->xids, xwindowp) == NULL);
-
-  g_hash_table_insert (display->xids, xwindowp, window);
-}
-
-void
-meta_display_unregister_x_window (MetaDisplay *display,
-                                  Window       xwindow)
-{
-  g_return_if_fail (g_hash_table_lookup (display->xids, &xwindow) != NULL);
-
-  g_hash_table_remove (display->xids, &xwindow);
-}
-
 void
 meta_display_register_wayland_window (MetaDisplay *display,
                                       MetaWindow  *window)
@@ -1492,7 +1460,8 @@ meta_display_lookup_stack_id (MetaDisplay *display,
                               guint64      stack_id)
 {
   if (META_STACK_ID_IS_X11 (stack_id))
-    return meta_display_lookup_x_window (display, (Window)stack_id);
+    return meta_x11_display_lookup_x_window (display->x11_display,
+                                             (Window)stack_id);
   else
     return meta_display_lookup_stamp (display, stack_id);
 }
@@ -1521,37 +1490,6 @@ meta_display_describe_stack_id (MetaDisplay *display,
     snprintf (result, sizeof(buffer[0]), "%#" G_GINT64_MODIFIER "x", stack_id);
 
   return result;
-}
-
-/* We store sync alarms in the window ID hash table, because they are
- * just more types of XIDs in the same global space, but we have
- * typesafe functions to register/unregister for readability.
- */
-
-MetaWindow*
-meta_display_lookup_sync_alarm (MetaDisplay *display,
-                                XSyncAlarm   alarm)
-{
-  return g_hash_table_lookup (display->xids, &alarm);
-}
-
-void
-meta_display_register_sync_alarm (MetaDisplay *display,
-                                  XSyncAlarm  *alarmp,
-                                  MetaWindow  *window)
-{
-  g_return_if_fail (g_hash_table_lookup (display->xids, alarmp) == NULL);
-
-  g_hash_table_insert (display->xids, alarmp, window);
-}
-
-void
-meta_display_unregister_sync_alarm (MetaDisplay *display,
-                                    XSyncAlarm   alarm)
-{
-  g_return_if_fail (g_hash_table_lookup (display->xids, &alarm) != NULL);
-
-  g_hash_table_remove (display->xids, &alarm);
 }
 
 void
@@ -3003,17 +2941,6 @@ meta_display_is_pointer_emulating_sequence (MetaDisplay          *display,
     return FALSE;
 
   return display->pointer_emulating_sequence == sequence;
-}
-
-void
-meta_display_set_alarm_filter (MetaDisplay    *display,
-                               MetaAlarmFilter filter,
-                               gpointer        data)
-{
-  g_return_if_fail (filter == NULL || display->alarm_filter == NULL);
-
-  display->alarm_filter = filter;
-  display->alarm_filter_data = data;
 }
 
 void
