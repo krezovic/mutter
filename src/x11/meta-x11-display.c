@@ -47,7 +47,8 @@
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xfixes.h>
 
-
+#include "backends/meta-backend-private.h"
+#include "backends/x11/meta-backend-x11.h"
 #include "core/util-private.h"
 
 #ifdef HAVE_WAYLAND
@@ -58,6 +59,10 @@ G_DEFINE_TYPE (MetaX11Display, meta_x11_display, G_TYPE_OBJECT)
 
 static char *get_screen_name (Display *xdisplay,
                               int      number);
+
+static void update_cursor_theme    (MetaX11Display *x11_display);
+static void prefs_changed_callback (MetaPreference pref,
+                                    void          *data);
 
 static void
 meta_x11_display_class_init (MetaX11DisplayClass *klass)
@@ -339,6 +344,10 @@ meta_x11_display_open (MetaDisplay *display)
   query_xfixes_extension (x11_display);
   query_xi_extension (x11_display);
 
+  meta_prefs_add_listener (prefs_changed_callback, x11_display);
+
+  update_cursor_theme (x11_display);
+
   return x11_display;
 }
 
@@ -346,6 +355,8 @@ void
 meta_x11_display_close (MetaX11Display *x11_display)
 {
   g_assert (x11_display != NULL);
+
+  meta_prefs_remove_listener (prefs_changed_callback, x11_display);
 
   XFlush (x11_display->xdisplay);
 
@@ -472,4 +483,56 @@ get_screen_name (Display *xdisplay,
   g_free (dname);
 
   return scr;
+}
+
+void
+meta_x11_display_reload_cursor (MetaX11Display *x11_display)
+{
+  Cursor xcursor;
+  MetaCursor cursor = x11_display->display->current_cursor;
+
+  /* Set a cursor for X11 applications that don't specify their own */
+  xcursor = meta_x11_display_create_x_cursor (x11_display, cursor);
+
+  XDefineCursor (x11_display->xdisplay, x11_display->xroot, xcursor);
+  XFlush (x11_display->xdisplay);
+  XFreeCursor (x11_display->xdisplay, xcursor);
+}
+
+static void
+set_cursor_theme (Display *xdisplay)
+{
+  XcursorSetTheme (xdisplay, meta_prefs_get_cursor_theme ());
+  XcursorSetDefaultSize (xdisplay, meta_prefs_get_cursor_size ());
+}
+
+static void
+update_cursor_theme (MetaX11Display *x11_display)
+{
+  {
+    set_cursor_theme (x11_display->xdisplay);
+    meta_x11_display_reload_cursor (x11_display);
+  }
+
+  {
+    MetaBackend *backend = meta_get_backend ();
+    if (META_IS_BACKEND_X11 (backend))
+      {
+        Display *xdisplay = meta_backend_x11_get_xdisplay (META_BACKEND_X11 (backend));
+        set_cursor_theme (xdisplay);
+      }
+  }
+}
+
+static void
+prefs_changed_callback (MetaPreference pref,
+                        void          *data)
+{
+  MetaX11Display *x11_display = data;
+
+  if (pref == META_PREF_CURSOR_THEME ||
+      pref == META_PREF_CURSOR_SIZE)
+    {
+      update_cursor_theme (x11_display);
+    }
 }
