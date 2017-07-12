@@ -51,6 +51,9 @@
 #include "backends/x11/meta-backend-x11.h"
 #include "core/util-private.h"
 
+#include "x11/group-props.h"
+#include "x11/window-props.h"
+
 #ifdef HAVE_WAYLAND
 #include "wayland/meta-xwayland-private.h"
 #endif
@@ -351,6 +354,13 @@ meta_x11_display_open (MetaDisplay *display)
   x11_display->xids = g_hash_table_new (meta_unsigned_long_hash,
                                         meta_unsigned_long_equal);
 
+  x11_display->groups_by_leader = NULL;
+
+  x11_display->prop_hooks = NULL;
+  meta_x11_display_init_window_prop_hooks (x11_display);
+  x11_display->group_prop_hooks = NULL;
+  meta_x11_display_init_group_prop_hooks (x11_display);
+
   return x11_display;
 }
 
@@ -358,6 +368,9 @@ void
 meta_x11_display_close (MetaX11Display *x11_display)
 {
   g_assert (x11_display != NULL);
+
+  meta_x11_display_free_window_prop_hooks (x11_display);
+  meta_x11_display_free_group_prop_hooks (x11_display);
 
   meta_prefs_remove_listener (prefs_changed_callback, x11_display);
 
