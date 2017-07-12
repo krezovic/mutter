@@ -37,6 +37,7 @@
 #include "keybindings-private.h"
 #include "startup-notification-private.h"
 #include "meta-gesture-tracker-private.h"
+#include "stack-tracker.h"
 #include <meta/prefs.h>
 #include <meta/barrier.h>
 #include <clutter/clutter.h>
@@ -244,6 +245,9 @@ struct _MetaDisplay
 
   MetaRectangle rect;  /* Size of screen; rect.x & rect.y are always 0 */
   MetaCursor current_cursor;
+
+  MetaStack *stack;
+  MetaStackTracker *stack_tracker;
 };
 
 struct _MetaDisplayClass
@@ -251,6 +255,7 @@ struct _MetaDisplayClass
   GObjectClass parent_class;
 
   void (*monitors_changed)  (MetaDisplay *);
+  void (*restacked)         (MetaDisplay *);
 };
 
 #define XSERVER_TIME_IS_BEFORE_ASSUMING_REAL_TIMESTAMPS(time1, time2) \
@@ -427,5 +432,7 @@ void meta_display_foreach_window (MetaDisplay          *display,
                                   MetaListWindowsFlags  flags,
                                   MetaDisplayWindowFunc func,
                                   gpointer              data);
+
+void meta_display_restacked (MetaDisplay *display);
 
 #endif

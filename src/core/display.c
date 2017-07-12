@@ -133,6 +133,7 @@ enum
   SHOW_OSD,
   PAD_MODE_SWITCH,
   MONITORS_CHANGED,
+  RESTACKED,
   LAST_SIGNAL
 };
 
@@ -403,6 +404,14 @@ meta_display_class_init (MetaDisplayClass *klass)
                   NULL, NULL, NULL,
 		  G_TYPE_NONE, 0);
 
+  display_signals[RESTACKED] =
+    g_signal_new ("restacked",
+                  G_TYPE_FROM_CLASS (object_class),
+                  G_SIGNAL_RUN_LAST,
+                  G_STRUCT_OFFSET (MetaDisplayClass, restacked),
+                  NULL, NULL, NULL,
+                  G_TYPE_NONE, 0);
+
   g_object_class_install_property (object_class,
                                    PROP_FOCUS_WINDOW,
                                    g_param_spec_object ("focus-window",
@@ -672,6 +681,9 @@ meta_display_open (void)
 
   xdisplay = display->x11_display->xdisplay;
 
+  display->stack = meta_stack_new (display);
+  display->stack_tracker = meta_stack_tracker_new (display);
+
   display->focus_serial = 0;
   display->server_focus_window = None;
   display->server_focus_serial = 0;
@@ -787,7 +799,7 @@ meta_display_open (void)
 
   enable_compositor (display);
 
-  meta_screen_create_guard_window (screen);
+  meta_x11_display_create_guard_window (display->x11_display);
 
   /* Set up touch support */
   display->gesture_tracker = meta_gesture_tracker_new ();
@@ -942,6 +954,9 @@ meta_display_close (MetaDisplay *display,
 
   g_clear_object (&display->startup_notification);
   g_clear_object (&display->gesture_tracker);
+
+  meta_stack_free (display->stack);
+  meta_stack_tracker_free (display->stack_tracker);
 
   if (display->focus_timeout_id)
     g_source_remove (display->focus_timeout_id);
@@ -1210,7 +1225,7 @@ window_raise_with_delay_callback (void *data)
   /* If we aren't already on top, check whether the pointer is inside
    * the window and raise the window if so.
    */
-  if (meta_stack_get_top (window->screen->stack) != window)
+  if (meta_stack_get_top (window->display->stack) != window)
     {
       if (meta_window_has_pointer (window))
 	meta_window_raise (window);
@@ -2560,7 +2575,7 @@ meta_display_stack_cmp (const void *a,
   MetaWindow *aw = (void*) a;
   MetaWindow *bw = (void*) b;
 
-  return meta_stack_windows_cmp (aw->screen->stack, aw, bw);
+  return meta_stack_windows_cmp (aw->display->stack, aw, bw);
 }
 
 /**
@@ -3163,4 +3178,10 @@ on_monitors_changed (MetaMonitorManager *manager,
   meta_cursor_renderer_force_update (cursor_renderer);
 
   g_signal_emit (display, display_signals[MONITORS_CHANGED], 0);
+}
+
+void
+meta_display_restacked (MetaDisplay *display)
+{
+  g_signal_emit (display, display_signals[RESTACKED], 0);
 }
