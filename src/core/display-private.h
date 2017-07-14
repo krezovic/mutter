@@ -482,4 +482,6 @@ void     meta_display_workspace_switched (MetaDisplay        *display,
                                           int                 to,
                                           MetaMotionDirection direction);
 
+void meta_display_manage_all_windows (MetaDisplay *display);
+
 #endif

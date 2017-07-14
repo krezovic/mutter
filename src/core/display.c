@@ -760,14 +760,16 @@ meta_display_open (void)
 
   meta_display_set_cursor (display, META_CURSOR_DEFAULT);
 
-  display->keys_grabbed = FALSE;
-  meta_display_grab_keys (display);
-
   x11_display = meta_x11_display_open (display);
   g_assert (x11_display != NULL); /* Required, for now */
   display->x11_display = x11_display;
 
   timestamp = display->x11_display->timestamp;
+
+  display->x11_display->ui = meta_ui_new (display->x11_display->xdisplay);
+
+  display->keys_grabbed = FALSE;
+  meta_display_grab_keys (display);
 
   display->stack = meta_stack_new (display);
   display->stack_tracker = meta_stack_tracker_new (display);
@@ -833,7 +835,7 @@ meta_display_open (void)
    * we start out with no windows.
    */
   if (!meta_is_wayland_compositor ())
-    meta_screen_manage_all_windows (screen);
+    meta_display_manage_all_windows (display);
 
   if (old_active_xwindow != None)
     {
@@ -4558,4 +4560,28 @@ meta_display_workspace_switched (MetaDisplay        *display,
 {
   g_signal_emit (display, display_signals[WORKSPACE_SWITCHED], 0,
                  from, to, direction);
+}
+
+void
+meta_display_manage_all_windows (MetaDisplay *display)
+{
+  guint64 *_children;
+  guint64 *children;
+  int n_children, i;
+
+  meta_stack_freeze (display->stack);
+  meta_stack_tracker_get_stack (display->stack_tracker, &_children, &n_children);
+
+  /* Copy the stack as it will be modified as part of the loop */
+  children = g_memdup (_children, sizeof (guint64) * n_children);
+
+  for (i = 0; i < n_children; ++i)
+    {
+      g_assert (META_STACK_ID_IS_X11 (children[i]));
+      meta_window_x11_new (display, children[i], TRUE,
+                           META_COMP_EFFECT_NONE);
+    }
+
+  g_free (children);
+  meta_stack_thaw (display->stack);
 }

@@ -763,8 +763,6 @@ meta_x11_display_open (MetaDisplay *display)
 
   set_desktop_geometry_hint (x11_display);
 
-  x11_display->ui = meta_ui_new (xdisplay);
-
   return x11_display;
 }
 

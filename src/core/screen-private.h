@@ -59,7 +59,4 @@ MetaScreen*   meta_screen_new                 (MetaDisplay                *displ
 void          meta_screen_free                (MetaScreen                 *screen,
                                                guint32                     timestamp);
 
-void          meta_screen_manage_all_windows  (MetaScreen                 *screen);
-
-
 #endif

@@ -1579,7 +1579,7 @@ handle_other_xevent (MetaX11Display *x11_display,
 
                   showing_desktop = event->xclient.data.l[0] != 0;
                   /* FIXME: Braindead protocol doesn't have a timestamp */
-                  timestamp = meta_display_get_current_time_roundtrip (display);
+                  timestamp = meta_x11_display_get_current_time_roundtrip (x11_display);
                   meta_verbose ("Request to %s desktop\n",
                                 showing_desktop ? "show" : "hide");
 
