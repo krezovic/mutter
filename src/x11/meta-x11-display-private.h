@@ -33,6 +33,7 @@
 #include "meta/common.h"
 #include "meta/types.h"
 #include "meta/meta-x11-display.h"
+#include "ui/ui.h"
 
 typedef struct _MetaGroupPropHooks  MetaGroupPropHooks;
 typedef struct _MetaWindowPropHooks MetaWindowPropHooks;
@@ -111,6 +112,8 @@ struct _MetaX11Display
 
   MetaAlarmFilter alarm_filter;
   gpointer alarm_filter_data;
+
+  MetaUI *ui;
 
   int composite_event_base;
   int composite_error_base;

@@ -762,6 +762,7 @@ meta_x11_display_open (MetaDisplay *display)
 
   set_desktop_geometry_hint (x11_display);
 
+  x11_display->ui = meta_ui_new (xdisplay);
 
   return x11_display;
 }
@@ -776,6 +777,8 @@ meta_x11_display_close (MetaX11Display *x11_display)
   g_signal_handlers_disconnect_by_func (x11_display->display,
                                         (gpointer)on_monitors_changed,
                                         x11_display);
+
+  meta_ui_free (x11_display->ui);
 
   meta_x11_display_free_window_prop_hooks (x11_display);
   meta_x11_display_free_group_prop_hooks (x11_display);

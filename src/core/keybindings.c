@@ -695,7 +695,7 @@ ungrab_key_bindings (MetaDisplay *display)
 {
   GSList *windows, *l;
 
-  meta_screen_ungrab_keys (display->screen);
+  meta_display_ungrab_keys (display);
 
   windows = meta_display_list_windows (display, META_LIST_DEFAULT);
   for (l = windows; l; l = l->next)
@@ -712,7 +712,7 @@ grab_key_bindings (MetaDisplay *display)
 {
   GSList *windows, *l;
 
-  meta_screen_grab_keys (display->screen);
+  meta_display_grab_keys (display);
 
   windows = meta_display_list_windows (display, META_LIST_DEFAULT);
   for (l = windows; l; l = l->next)
@@ -1292,10 +1292,9 @@ change_binding_keygrabs (MetaKeyBindingManager *keys,
 }
 
 static void
-meta_screen_change_keygrabs (MetaScreen *screen,
-                             gboolean    grab)
+meta_display_change_keygrabs (MetaDisplay *display,
+                              gboolean     grab)
 {
-  MetaDisplay *display = screen->display;
   MetaKeyBindingManager *keys = &display->key_binding_manager;
   int i;
 
@@ -1312,25 +1311,25 @@ meta_screen_change_keygrabs (MetaScreen *screen,
 }
 
 void
-meta_screen_grab_keys (MetaScreen *screen)
+meta_display_grab_keys (MetaDisplay *display)
 {
-  if (screen->keys_grabbed)
+  if (display->keys_grabbed)
     return;
 
-  meta_screen_change_keygrabs (screen, TRUE);
+  meta_display_change_keygrabs (display, TRUE);
 
-  screen->keys_grabbed = TRUE;
+  display->keys_grabbed = TRUE;
 }
 
 void
-meta_screen_ungrab_keys (MetaScreen  *screen)
+meta_display_ungrab_keys (MetaDisplay *display)
 {
-  if (!screen->keys_grabbed)
+  if (!display->keys_grabbed)
     return;
 
-  meta_screen_change_keygrabs (screen, FALSE);
+  meta_display_change_keygrabs (display, FALSE);
 
-  screen->keys_grabbed = FALSE;
+  display->keys_grabbed = FALSE;
 }
 
 static void

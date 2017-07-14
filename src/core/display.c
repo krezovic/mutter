@@ -689,6 +689,9 @@ meta_display_open (void)
 
   meta_display_set_cursor (display, META_CURSOR_DEFAULT);
 
+  display->keys_grabbed = FALSE;
+  meta_display_grab_keys (display);
+
   x11_display = meta_x11_display_open (display);
   g_assert (x11_display != NULL); /* Required, for now */
   display->x11_display = x11_display;
@@ -897,6 +900,8 @@ meta_display_close (MetaDisplay *display,
 
   meta_stack_free (display->stack);
   meta_stack_tracker_free (display->stack_tracker);
+
+  meta_display_ungrab_keys (display);
 
   if (display->focus_timeout_id)
     g_source_remove (display->focus_timeout_id);
@@ -3552,4 +3557,27 @@ meta_display_get_monitor_in_fullscreen (MetaDisplay *display,
 
   /* We use -1 as a flag to mean "not known yet" for notification 
   purposes */ return logical_monitor->in_fullscreen == TRUE;
+}
+
+MetaWindow *
+meta_display_get_mouse_window (MetaDisplay *display,
+                               MetaWindow  *not_this_one)
+{
+  MetaBackend *backend = meta_get_backend ();
+  MetaCursorTracker *cursor_tracker = meta_backend_get_cursor_tracker (backend);
+  MetaWindow *window;
+  int x, y;
+
+  if (not_this_one)
+    meta_topic (META_DEBUG_FOCUS,
+                "Focusing mouse window excluding %s\n", not_this_one->desc);
+
+  meta_cursor_tracker_get_pointer (cursor_tracker, &x, &y, NULL);
+
+  window = meta_stack_get_default_focus_window_at_point (display->stack,
+                                                         display->screen->active_workspace,
+                                                         not_this_one,
+                                                         x, y);
+
+  return window;
 }
