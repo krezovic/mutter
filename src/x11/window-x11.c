@@ -1630,16 +1630,16 @@ meta_window_x11_set_net_wm_state (MetaWindow *window)
       if (meta_window_has_fullscreen_monitors (window))
         {
           data[0] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
                                                            window->fullscreen_monitors.top);
           data[1] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
                                                            window->fullscreen_monitors.bottom);
           data[2] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
                                                            window->fullscreen_monitors.left);
           data[3] =
-            meta_screen_logical_monitor_to_xinerama_index (window->screen,
+            meta_x11_display_logical_monitor_to_xinerama_index (window->display->x11_display,
                                                            window->fullscreen_monitors.right);
 
           meta_verbose ("Setting _NET_WM_FULLSCREEN_MONITORS\n");
@@ -2053,7 +2053,7 @@ meta_window_move_resize_request (MetaWindow *window,
       rect.width = width;
       rect.height = height;
 
-      meta_screen_get_monitor_geometry (window->screen, window->monitor->number, &monitor_rect);
+      meta_display_get_monitor_geometry (window->display, window->monitor->number, &monitor_rect);
 
       /* Workaround braindead legacy apps that don't know how to
        * fullscreen themselves properly - don't get fooled by
@@ -2696,16 +2696,16 @@ meta_window_x11_client_message (MetaWindow *window,
                     window->desc);
 
       top =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
                                                        event->xclient.data.l[0]);
       bottom =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
                                                        event->xclient.data.l[1]);
       left =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
                                                        event->xclient.data.l[2]);
       right =
-        meta_screen_xinerama_index_to_logical_monitor (window->screen,
+        meta_x11_display_xinerama_index_to_logical_monitor (window->display->x11_display,
                                                        event->xclient.data.l[3]);
       /* source_indication = event->xclient.data.l[4]; */
 
