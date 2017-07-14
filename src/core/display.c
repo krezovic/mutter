@@ -653,8 +653,6 @@ meta_display_open (void)
 
   meta_prefs_add_listener (prefs_changed_callback, display);
 
-  meta_display_init_events_x11 (display);
-
   display->last_focus_time = timestamp;
   display->last_user_time = timestamp;
   display->compositor = NULL;
@@ -877,9 +875,6 @@ meta_display_close (MetaDisplay *display,
     meta_compositor_destroy (display->compositor);
 
   meta_prefs_remove_listener (prefs_changed_callback, display);
-
-  /* Stop caring about events */
-  meta_display_free_events_x11 (display);
 
   meta_x11_display_close (display->x11_display);
   display->x11_display = NULL;
