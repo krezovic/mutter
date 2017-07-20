@@ -763,8 +763,6 @@ meta_display_open (void)
 
   timestamp = display->x11_display->timestamp;
 
-  display->x11_display->ui = meta_ui_new (display->x11_display->xdisplay);
-
   display->keys_grabbed = FALSE;
   meta_display_grab_keys (display);
 
@@ -872,17 +870,20 @@ meta_display_list_windows (MetaDisplay          *display,
 
   winlist = NULL;
 
-  g_hash_table_iter_init (&iter, display->x11_display->xids);
-  while (g_hash_table_iter_next (&iter, &key, &value))
+  if (display->x11_display)
     {
-      MetaWindow *window = value;
+      g_hash_table_iter_init (&iter, display->x11_display->xids);
+      while (g_hash_table_iter_next (&iter, &key, &value))
+        {
+          MetaWindow *window = value;
 
-      if (!META_IS_WINDOW (window) || window->unmanaging)
-        continue;
+          if (!META_IS_WINDOW (window) || window->unmanaging)
+            continue;
 
-      if (!window->override_redirect ||
-          (flags & META_LIST_INCLUDE_OVERRIDE_REDIRECT) != 0)
-        winlist = g_slist_prepend (winlist, window);
+          if (!window->override_redirect ||
+              (flags & META_LIST_INCLUDE_OVERRIDE_REDIRECT) != 0)
+            winlist = g_slist_prepend (winlist, window);
+        }
     }
 
   g_hash_table_iter_init (&iter, display->wayland_windows);
