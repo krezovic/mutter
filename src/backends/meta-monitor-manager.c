@@ -1516,7 +1516,7 @@ meta_monitor_manager_legacy_handle_apply_configuration  (MetaDBusDisplayConfig *
 
   /* Update MetaMonitorConfig data structures immediately so that we
      don't revert the change at the next XRandR event, then ask the plugin
-     manager (through MetaScreen) to confirm the display change with the
+     manager (through MetaDisplay) to confirm the display change with the
      appropriate UI. Then wait 20 seconds and if not confirmed, revert the
      configuration.
   */

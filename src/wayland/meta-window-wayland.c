@@ -544,7 +544,6 @@ meta_window_wayland_new (MetaDisplay        *display,
                          MetaWaylandSurface *surface)
 {
   XWindowAttributes attrs = { 0 };
-  MetaScreen *scr = display->screen;
   MetaWindow *window;
 
   /*
@@ -570,7 +569,6 @@ meta_window_wayland_new (MetaDisplay        *display,
                                                 */
 
   window = _meta_window_shared_new (display,
-                                    scr,
                                     META_WINDOW_CLIENT_TYPE_WAYLAND,
                                     surface,
                                     None,
