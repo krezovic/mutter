@@ -42,6 +42,8 @@ struct _MetaX11Display
   char *name;
   char *screen_name;
 
+  gulong cursor_updated_handler;
+
   Display *xdisplay;
   Window xroot;
   int default_depth;
@@ -93,5 +95,7 @@ Window meta_x11_display_create_offscreen_window (MetaX11Display *x11_display,
 
 Cursor meta_x11_display_create_x_cursor (MetaX11Display *x11_display,
                                          MetaCursor      cursor);
+
+void meta_x11_display_reload_cursor (MetaX11Display *x11_display);
 
 #endif /* META_X11_DISPLAY_PRIVATE_H */

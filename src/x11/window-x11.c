@@ -1316,7 +1316,7 @@ meta_window_x11_update_struts (MetaWindow *window)
 
               temp = g_new (MetaStrut, 1);
               temp->side = 1 << i; /* See MetaSide def.  Matches nicely, eh? */
-              temp->rect = window->screen->rect;
+              temp->rect = window->display->rect;
               switch (temp->side)
                 {
                 case META_SIDE_RIGHT:
@@ -1379,7 +1379,7 @@ meta_window_x11_update_struts (MetaWindow *window)
 
               temp = g_new (MetaStrut, 1);
               temp->side = 1 << i;
-              temp->rect = window->screen->rect;
+              temp->rect = window->display->rect;
               switch (temp->side)
                 {
                 case META_SIDE_RIGHT:
@@ -1456,7 +1456,7 @@ meta_window_x11_update_icon (MetaWindow       *window,
   MetaWindowX11 *window_x11 = META_WINDOW_X11 (window);
   MetaWindowX11Private *priv = meta_window_x11_get_instance_private (window_x11);
 
-  return meta_read_icons (window->screen,
+  return meta_read_icons (window->display->x11_display,
                           window->xwindow,
                           &priv->icon_cache,
                           priv->wm_hints_pixmap,

@@ -47,7 +47,8 @@
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xfixes.h>
 
-
+#include "backends/meta-backend-private.h"
+#include "backends/x11/meta-backend-x11.h"
 #include "core/util-private.h"
 #include "meta/errors.h"
 
@@ -60,10 +61,20 @@ G_DEFINE_TYPE (MetaX11Display, meta_x11_display, G_TYPE_OBJECT)
 static char *get_screen_name (Display *xdisplay,
                               int      number);
 
+static void on_cursor_updated (MetaDisplay    *display,
+                               MetaX11Display *x11_display);
+
+static void update_cursor_theme (MetaX11Display *x11_display);
+
 static void
 meta_x11_display_dispose (GObject *object)
 {
   MetaX11Display *x11_display = META_X11_DISPLAY (object);
+
+  if (g_signal_handler_is_connected (x11_display->display,
+                                     x11_display->cursor_updated_handler))
+    g_signal_handler_disconnect (x11_display->display,
+                                 x11_display->cursor_updated_handler);
 
   if (x11_display->xroot != None)
     {
@@ -388,6 +399,14 @@ meta_x11_display_new (MetaDisplay *display, GError **error)
   query_xfixes_extension (x11_display);
   query_xi_extension (x11_display);
 
+  x11_display->cursor_updated_handler =
+     g_signal_connect (display,
+                       "cursor-updated",
+                       G_CALLBACK (on_cursor_updated),
+                       x11_display);
+
+  update_cursor_theme (x11_display);
+
   return x11_display;
 }
 
@@ -508,4 +527,50 @@ get_screen_name (Display *xdisplay,
   g_free (dname);
 
   return scr;
+}
+
+void
+meta_x11_display_reload_cursor (MetaX11Display *x11_display)
+{
+  Cursor xcursor;
+  MetaCursor cursor = x11_display->display->current_cursor;
+
+  /* Set a cursor for X11 applications that don't specify their own */
+  xcursor = meta_x11_display_create_x_cursor (x11_display, cursor);
+
+  XDefineCursor (x11_display->xdisplay, x11_display->xroot, xcursor);
+  XFlush (x11_display->xdisplay);
+  XFreeCursor (x11_display->xdisplay, xcursor);
+}
+
+static void
+set_cursor_theme (Display *xdisplay)
+{
+  XcursorSetTheme (xdisplay, meta_prefs_get_cursor_theme ());
+  XcursorSetDefaultSize (xdisplay, meta_prefs_get_cursor_size ());
+}
+
+static void
+update_cursor_theme (MetaX11Display *x11_display)
+{
+  {
+    set_cursor_theme (x11_display->xdisplay);
+    meta_x11_display_reload_cursor (x11_display);
+  }
+
+  {
+    MetaBackend *backend = meta_get_backend ();
+    if (META_IS_BACKEND_X11 (backend))
+      {
+        Display *xdisplay = meta_backend_x11_get_xdisplay (META_BACKEND_X11 (backend));
+        set_cursor_theme (xdisplay);
+      }
+  }
+}
+
+static void
+on_cursor_updated (MetaDisplay    *display,
+                   MetaX11Display *x11_display)
+{
+  update_cursor_theme (x11_display);
 }
