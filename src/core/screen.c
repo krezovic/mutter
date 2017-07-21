@@ -89,13 +89,6 @@ static guint screen_signals[LAST_SIGNAL] = { 0 };
 
 G_DEFINE_TYPE (MetaScreen, meta_screen, G_TYPE_OBJECT);
 
-static GQuark quark_screen_x11_logical_monitor_data = 0;
-
-typedef struct _MetaScreenX11LogicalMonitorData
-{
-  int xinerama_index;
-} MetaScreenX11LogicalMonitorData;
-
 static void
 meta_screen_set_property (GObject      *object,
                           guint         prop_id,
@@ -190,135 +183,11 @@ meta_screen_class_init (MetaScreenClass *klass)
   g_object_class_install_property (object_class,
                                    PROP_N_WORKSPACES,
                                    pspec);
-
-  quark_screen_x11_logical_monitor_data =
-    g_quark_from_static_string ("-meta-screen-logical-monitor-x11-data");
 }
 
 static void
 meta_screen_init (MetaScreen *screen)
 {
-}
-
-static MetaScreenX11LogicalMonitorData *
-get_screen_x11_logical_monitor_data (MetaLogicalMonitor *logical_monitor)
-{
-  return g_object_get_qdata (G_OBJECT (logical_monitor),
-                             quark_screen_x11_logical_monitor_data);
-}
-
-static MetaScreenX11LogicalMonitorData *
-ensure_screen_x11_logical_monitor_data (MetaLogicalMonitor *logical_monitor)
-{
-  MetaScreenX11LogicalMonitorData *data;
-
-  data = get_screen_x11_logical_monitor_data (logical_monitor);
-  if (data)
-    return data;
-
-  data = g_new0 (MetaScreenX11LogicalMonitorData, 1);
-  g_object_set_qdata_full (G_OBJECT (logical_monitor),
-                           quark_screen_x11_logical_monitor_data,
-                           data,
-                           g_free);
-
-  return data;
-}
-
-static void
-meta_screen_ensure_xinerama_indices (MetaScreen *screen)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-  GList *logical_monitors, *l;
-  XineramaScreenInfo *infos;
-  int n_infos, j;
-
-  if (screen->has_xinerama_indices)
-    return;
-
-  screen->has_xinerama_indices = TRUE;
-
-  if (!XineramaIsActive (screen->display->x11_display->xdisplay))
-    return;
-
-  infos = XineramaQueryScreens (screen->display->x11_display->xdisplay,
-                                &n_infos);
-  if (n_infos <= 0 || infos == NULL)
-    {
-      meta_XFree (infos);
-      return;
-    }
-
-  logical_monitors =
-    meta_monitor_manager_get_logical_monitors (monitor_manager);
-
-  for (l = logical_monitors; l; l = l->next)
-    {
-      MetaLogicalMonitor *logical_monitor = l->data;
-
-      for (j = 0; j < n_infos; ++j)
-        {
-          if (logical_monitor->rect.x == infos[j].x_org &&
-              logical_monitor->rect.y == infos[j].y_org &&
-              logical_monitor->rect.width == infos[j].width &&
-              logical_monitor->rect.height == infos[j].height)
-            {
-              MetaScreenX11LogicalMonitorData *logical_monitor_data;
-
-              logical_monitor_data =
-                ensure_screen_x11_logical_monitor_data (logical_monitor);
-              logical_monitor_data->xinerama_index = j;
-            }
-        }
-    }
-
-  meta_XFree (infos);
-}
-
-int
-meta_screen_logical_monitor_to_xinerama_index (MetaScreen         *screen,
-                                               MetaLogicalMonitor *logical_monitor)
-{
-  MetaScreenX11LogicalMonitorData *logical_monitor_data;
-
-  g_return_val_if_fail (logical_monitor, -1);
-
-  meta_screen_ensure_xinerama_indices (screen);
-
-  logical_monitor_data = get_screen_x11_logical_monitor_data (logical_monitor);
-
-  return logical_monitor_data->xinerama_index;
-}
-
-MetaLogicalMonitor *
-meta_screen_xinerama_index_to_logical_monitor (MetaScreen *screen,
-                                               int         xinerama_index)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-  GList *logical_monitors, *l;
-
-  meta_screen_ensure_xinerama_indices (screen);
-
-  logical_monitors =
-    meta_monitor_manager_get_logical_monitors (monitor_manager);
-
-  for (l = logical_monitors; l; l = l->next)
-    {
-      MetaLogicalMonitor *logical_monitor = l->data;
-      MetaScreenX11LogicalMonitorData *logical_monitor_data;
-
-      logical_monitor_data =
-        ensure_screen_x11_logical_monitor_data (logical_monitor);
-
-      if (logical_monitor_data->xinerama_index == xinerama_index)
-        return logical_monitor;
-    }
-
-  return NULL;
 }
 
 static void
@@ -331,8 +200,6 @@ reload_logical_monitors (MetaScreen *screen)
       MetaWorkspace *space = l->data;
       meta_workspace_invalidate_work_area (space);
     }
-
-  screen->has_xinerama_indices = FALSE;
 }
 
 MetaScreen*
@@ -749,141 +616,6 @@ meta_screen_get_mouse_window (MetaScreen  *screen,
                                                          x, y);
 
   return window;
-}
-
-int
-meta_screen_get_monitor_index_for_rect (MetaScreen    *screen,
-                                        MetaRectangle *rect)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-  MetaLogicalMonitor *logical_monitor;
-
-  logical_monitor =
-    meta_monitor_manager_get_logical_monitor_from_rect (monitor_manager, rect);
-  return logical_monitor->number;
-}
-
-int
-meta_screen_get_monitor_neighbor_index (MetaScreen         *screen,
-                                        int                 which_monitor,
-                                        MetaScreenDirection direction)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-  MetaLogicalMonitor *logical_monitor;
-  MetaLogicalMonitor *neighbor;
-
-  logical_monitor =
-    meta_monitor_manager_get_logical_monitor_from_number (monitor_manager,
-                                                          which_monitor);
-  neighbor = meta_monitor_manager_get_logical_monitor_neighbor (monitor_manager,
-                                                                logical_monitor,
-                                                                direction);
-  return neighbor ? neighbor->number : -1;
-}
-
-/**
- * meta_screen_get_current_monitor:
- * @screen: a #MetaScreen
- *
- * Gets the index of the monitor that currently has the mouse pointer.
- *
- * Return value: a monitor index
- */
-int
-meta_screen_get_current_monitor (MetaScreen *screen)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaLogicalMonitor *logical_monitor;
-
-  logical_monitor = meta_backend_get_current_logical_monitor (backend);
-
-  /* Pretend its the first when there is no actual current monitor. */
-  if (!logical_monitor)
-    return 0;
-
-  return logical_monitor->number;
-}
-
-/**
- * meta_screen_get_n_monitors:
- * @screen: a #MetaScreen
- *
- * Gets the number of monitors that are joined together to form @screen.
- *
- * Return value: the number of monitors
- */
-int
-meta_screen_get_n_monitors (MetaScreen *screen)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-
-  g_return_val_if_fail (META_IS_SCREEN (screen), 0);
-
-  return meta_monitor_manager_get_num_logical_monitors (monitor_manager);
-}
-
-/**
- * meta_screen_get_primary_monitor:
- * @screen: a #MetaScreen
- *
- * Gets the index of the primary monitor on this @screen.
- *
- * Return value: a monitor index
- */
-int
-meta_screen_get_primary_monitor (MetaScreen *screen)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-  MetaLogicalMonitor *logical_monitor;
-
-  g_return_val_if_fail (META_IS_SCREEN (screen), 0);
-
-  logical_monitor =
-    meta_monitor_manager_get_primary_logical_monitor (monitor_manager);
-  if (logical_monitor)
-    return logical_monitor->number;
-  else
-    return 0;
-}
-
-/**
- * meta_screen_get_monitor_geometry:
- * @screen: a #MetaScreen
- * @monitor: the monitor number
- * @geometry: (out): location to store the monitor geometry
- *
- * Stores the location and size of the indicated monitor in @geometry.
- */
-void
-meta_screen_get_monitor_geometry (MetaScreen    *screen,
-                                  int            monitor,
-                                  MetaRectangle *geometry)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-  MetaLogicalMonitor *logical_monitor;
-#ifndef G_DISABLE_CHECKS
-  int n_logical_monitors =
-    meta_monitor_manager_get_num_logical_monitors (monitor_manager);
-#endif
-
-  g_return_if_fail (META_IS_SCREEN (screen));
-  g_return_if_fail (monitor >= 0 && monitor < n_logical_monitors);
-  g_return_if_fail (geometry != NULL);
-
-  logical_monitor =
-    meta_monitor_manager_get_logical_monitor_from_number (monitor_manager,
-                                                          monitor);
-  *geometry = logical_monitor->rect;
 }
 
 #define _NET_WM_ORIENTATION_HORZ 0
@@ -1599,43 +1331,4 @@ meta_screen_set_active_workspace_hint (MetaScreen *screen)
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
   meta_error_trap_pop (x11_display);
-}
-
-/**
- * meta_screen_get_monitor_in_fullscreen:
- * @screen: a #MetaScreen
- * @monitor: the monitor number
- *
- * Determines whether there is a fullscreen window obscuring the specified
- * monitor. If there is a fullscreen window, the desktop environment will
- * typically hide any controls that might obscure the fullscreen window.
- *
- * You can get notification when this changes by connecting to
- * MetaScreen::in-fullscreen-changed.
- *
- * Returns: %TRUE if there is a fullscreen window covering the specified monitor.
- */
-gboolean
-meta_screen_get_monitor_in_fullscreen (MetaScreen  *screen,
-                                       int          monitor)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaMonitorManager *monitor_manager =
-    meta_backend_get_monitor_manager (backend);
-  MetaLogicalMonitor *logical_monitor;
-#ifndef G_DISABLE_CHECKS
-  int n_logical_monitors =
-    meta_monitor_manager_get_num_logical_monitors (monitor_manager);
-#endif
-
-  g_return_val_if_fail (META_IS_SCREEN (screen), FALSE);
-  g_return_val_if_fail (monitor >= 0 &&
-                        monitor < n_logical_monitors, FALSE);
-
-  logical_monitor =
-    meta_monitor_manager_get_logical_monitor_from_number (monitor_manager,
-                                                          monitor);
-
-  /* We use -1 as a flag to mean "not known yet" for notification purposes */
-  return logical_monitor->in_fullscreen == TRUE;
 }
