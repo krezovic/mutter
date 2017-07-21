@@ -244,6 +244,8 @@ struct _MetaDisplay
 
   guint work_area_later;
   guint check_fullscreen_later;
+
+  guint keys_grabbed : 1;
 };
 
 struct _MetaDisplayClass
@@ -433,5 +435,8 @@ gboolean meta_display_apply_startup_properties (MetaDisplay *display,
 
 void meta_display_queue_workarea_recalc  (MetaDisplay *display);
 void meta_display_queue_check_fullscreen (MetaDisplay *display);
+
+MetaWindow *meta_display_get_pointer_window (MetaDisplay *display,
+                                             MetaWindow  *not_this_one);
 
 #endif
