@@ -50,6 +50,7 @@ struct _MetaX11Display
   char *screen_name;
 
   gulong cursor_updated_handler;
+  gulong monitors_changed_handler;
 
   Display *xdisplay;
   Window xroot;
@@ -62,6 +63,11 @@ struct _MetaX11Display
 #define item(x) Atom atom_##x;
 #include "x11/atomnames.h"
 #undef item
+
+  /* Instead of unmapping withdrawn windows we can leave them mapped
+   * and restack them below a guard window. When using a compositor
+   * this allows us to provide live previews of unmapped windows */
+  Window guard_window;
 
   GHashTable *xids;
 
@@ -145,5 +151,7 @@ gboolean meta_x11_display_process_barrier_xevent (MetaX11Display *x11_display,
 void meta_x11_display_set_alarm_filter (MetaX11Display *x11_display,
                                         MetaAlarmFilter filter,
                                         gpointer        data);
+
+void meta_x11_display_create_guard_window (MetaX11Display *x11_display);
 
 #endif /* META_X11_DISPLAY_PRIVATE_H */
