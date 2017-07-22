@@ -484,4 +484,7 @@ void     meta_display_workspace_switched (MetaDisplay        *display,
 
 guint32 meta_display_get_server_time (MetaDisplay *display);
 
+void meta_display_x11_display_opened  (MetaDisplay *display);
+void meta_display_x11_display_closing (MetaDisplay *display);
+
 #endif

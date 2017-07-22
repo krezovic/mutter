@@ -56,6 +56,7 @@ static gboolean is_debugging = FALSE;
 static gboolean replace_current = FALSE;
 static int no_prefix = 0;
 static gboolean is_wayland_compositor = FALSE;
+static gboolean is_x11_compositor = TRUE;
 
 #ifdef WITH_VERBOSE_MODE
 static FILE* logfile = NULL;
@@ -205,6 +206,18 @@ void
 meta_set_is_wayland_compositor (gboolean value)
 {
   is_wayland_compositor = value;
+}
+
+gboolean
+meta_is_x11_compositor (void)
+{
+  return is_x11_compositor;
+}
+
+void
+meta_set_is_x11_compositor (gboolean value)
+{
+  is_x11_compositor = value;
 }
 
 char *

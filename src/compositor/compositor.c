@@ -484,10 +484,14 @@ void
 meta_compositor_manage (MetaCompositor *compositor)
 {
   MetaDisplay *display = compositor->display;
-  Display *xdisplay = display->x11_display->xdisplay;
+  Display *xdisplay = NULL;
   MetaBackend *backend = meta_get_backend ();
 
-  meta_x11_display_set_cm_selection (display->x11_display);
+  if (meta_is_x11_compositor ())
+    {
+      xdisplay = display->x11_display->xdisplay;
+      meta_x11_display_set_cm_selection (display->x11_display);
+    }
 
   compositor->stage = meta_backend_get_stage (backend);
 
@@ -553,7 +557,8 @@ meta_compositor_manage (MetaCompositor *compositor)
       compositor->have_x11_sync_object = meta_sync_ring_init (xdisplay);
     }
 
-  redirect_windows (display);
+  if (meta_is_x11_compositor ())
+    redirect_windows (display);
 
   compositor->plugin_mgr = meta_plugin_manager_new (compositor);
 }

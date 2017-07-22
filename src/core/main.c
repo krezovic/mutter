@@ -177,6 +177,7 @@ static gboolean  opt_sync;
 #ifdef HAVE_WAYLAND
 static gboolean  opt_wayland;
 static gboolean  opt_nested;
+static gboolean  opt_no_x11;
 #endif
 #ifdef HAVE_NATIVE_BACKEND
 static gboolean  opt_display_server;
@@ -229,6 +230,12 @@ static GOptionEntry meta_options[] = {
     "nested", 0, 0, G_OPTION_ARG_NONE,
     &opt_nested,
     N_("Run as a nested compositor"),
+    NULL
+  },
+  {
+    "no-x11", 0, 0, G_OPTION_ARG_NONE,
+    &opt_no_x11,
+    N_("Run wayland compositor without starting Xwayland"),
     NULL
   },
 #endif
@@ -441,6 +448,12 @@ calculate_compositor_configuration (MetaCompositorType *compositor_type,
     run_as_wayland_compositor = check_for_wayland_session_type ();
 #endif /* HAVE_NATIVE_BACKEND */
 
+  if (!run_as_wayland_compositor && opt_no_x11)
+    {
+      meta_warning ("Can't disable X11 support on X11 compositor\n");
+      meta_exit (META_EXIT_ERROR);
+    }
+
   if (run_as_wayland_compositor)
     *compositor_type = META_COMPOSITOR_TYPE_WAYLAND;
   else
@@ -542,6 +555,8 @@ meta_init (void)
       calculate_compositor_configuration (&compositor_type, &backend_gtype);
     }
 
+  meta_set_is_x11_compositor (!opt_no_x11);
+
 #ifdef HAVE_WAYLAND
   if (compositor_type == META_COMPOSITOR_TYPE_WAYLAND)
     meta_set_is_wayland_compositor (TRUE);
@@ -588,9 +603,11 @@ meta_init (void)
 
   meta_main_loop = g_main_loop_new (NULL, FALSE);
 
-  meta_ui_init ();
-
-  meta_restart_init ();
+  if (meta_is_x11_compositor ())
+    {
+      meta_ui_init ();
+      meta_restart_init ();
+    }
 }
 
 /**

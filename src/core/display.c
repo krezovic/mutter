@@ -117,6 +117,8 @@ G_DEFINE_TYPE(MetaDisplay, meta_display, G_TYPE_OBJECT);
 enum
 {
   CURSOR_UPDATED,
+  X11_DISPLAY_OPENED,
+  X11_DISPLAY_CLOSING,
   OVERLAY_KEY,
   ACCELERATOR_ACTIVATED,
   MODIFIERS_ACCELERATOR_ACTIVATED,
@@ -222,6 +224,22 @@ meta_display_class_init (MetaDisplayClass *klass)
 
   display_signals[CURSOR_UPDATED] =
     g_signal_new ("cursor-updated",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0,
+                  NULL, NULL, NULL,
+                  G_TYPE_NONE, 0);
+
+  display_signals[X11_DISPLAY_OPENED] =
+    g_signal_new ("x11-display-opened",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0,
+                  NULL, NULL, NULL,
+                  G_TYPE_NONE, 0);
+
+  display_signals[X11_DISPLAY_CLOSING] =
+    g_signal_new ("x11-display-closing",
                   G_TYPE_FROM_CLASS (klass),
                   G_SIGNAL_RUN_LAST,
                   0,
@@ -579,23 +597,29 @@ meta_display_remove_pending_pings_for_window (MetaDisplay *display,
 static void
 enable_compositor (MetaDisplay *display)
 {
-  MetaX11Display *x11_display = display->x11_display;
 
-  if (!META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ||
-      !META_X11_DISPLAY_HAS_DAMAGE (x11_display))
-    {
-      meta_warning ("Missing %s extension required for compositing",
-                    !META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ?
-                    "composite" : "damage");
-      return;
-    }
+  MetaX11Display *x11_display;
 
-  int version = (x11_display->composite_major_version * 10) +
-                 x11_display->composite_minor_version;
-  if (version < 3)
+  if (meta_is_x11_compositor ())
     {
-      meta_warning ("Your version of COMPOSITE is too old.");
-      return;
+      x11_display = display->x11_display;
+
+      if (!META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ||
+          !META_X11_DISPLAY_HAS_DAMAGE (x11_display))
+        {
+          meta_warning ("Missing %s extension required for compositing",
+                        !META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ?
+                        "composite" : "damage");
+          return;
+        }
+
+      int version = (x11_display->composite_major_version * 10) +
+                     x11_display->composite_minor_version;
+      if (version < 3)
+        {
+          meta_warning ("Your version of COMPOSITE is too old.");
+          return;
+        }
     }
 
   if (!display->compositor)
@@ -770,11 +794,18 @@ meta_display_open (void)
 
   meta_display_set_cursor (display, META_CURSOR_DEFAULT);
 
-  x11_display = meta_x11_display_new (display, &error);
-  g_assert (x11_display != NULL); /* Required, for now */
-  display->x11_display = x11_display;
+  if (meta_is_x11_compositor ())
+    {
+      x11_display = meta_x11_display_new (display, &error);
+      g_assert (x11_display != NULL); /* Required, for now */
+      display->x11_display = x11_display;
 
-  timestamp = display->x11_display->timestamp;
+      meta_display_x11_display_opened (display);
+
+      timestamp = display->x11_display->timestamp;
+    }
+  else
+    timestamp = meta_display_get_server_time (display);
 
   display->keys_grabbed = FALSE;
   meta_display_grab_keys (display);
@@ -813,7 +844,8 @@ meta_display_open (void)
 
   enable_compositor (display);
 
-  meta_x11_display_create_guard_window (display->x11_display);
+  if (meta_is_x11_compositor ())
+    meta_x11_display_create_guard_window (display->x11_display);
 
   /* Set up touch support */
   display->gesture_tracker = meta_gesture_tracker_new ();
@@ -836,7 +868,7 @@ meta_display_open (void)
       else
         meta_x11_display_focus_the_no_focus_window (display->x11_display, timestamp);
     }
-  else
+  else if (meta_is_x11_compositor ())
     meta_x11_display_focus_the_no_focus_window (display->x11_display, timestamp);
 
   meta_idle_monitor_init_dbus ();
@@ -1011,6 +1043,7 @@ meta_display_close (MetaDisplay *display,
 
   if (display->x11_display)
     {
+      meta_display_x11_display_closing (display);
       g_object_run_dispose (G_OBJECT (display->x11_display));
       g_clear_object (&display->x11_display);
     }
@@ -1168,7 +1201,10 @@ meta_display_get_current_time (MetaDisplay *display)
 guint32
 meta_display_get_current_time_roundtrip (MetaDisplay *display)
 {
-  return meta_x11_display_get_current_time_roundtrip (display->x11_display);
+  if (meta_is_x11_compositor ())
+    return meta_x11_display_get_current_time_roundtrip (display->x11_display);
+  else
+    return meta_display_get_server_time (display);
 }
 
 /**
@@ -4563,5 +4599,20 @@ meta_display_workspace_switched (MetaDisplay        *display,
 guint32
 meta_display_get_server_time (MetaDisplay *display)
 {
-  return CurrentTime;
+  if (meta_is_x11_compositor ())
+    return CurrentTime;
+  else
+    return (guint32) (g_get_monotonic_time () / 1000);
+}
+
+void
+meta_display_x11_display_opened (MetaDisplay *display)
+{
+  g_signal_emit (display, display_signals[X11_DISPLAY_OPENED], 0);
+}
+
+void
+meta_display_x11_display_closing (MetaDisplay *display)
+{
+  g_signal_emit (display, display_signals[X11_DISPLAY_CLOSING], 0);
 }
