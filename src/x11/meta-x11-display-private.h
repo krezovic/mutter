@@ -211,4 +211,6 @@ void meta_x11_display_set_active_workspace_hint   (MetaX11Display *x11_display);
 void meta_x11_display_set_number_of_spaces_hint   (MetaX11Display *x11_display,
                                                    int             n_spaces);
 
+void meta_x11_display_update_workspace_layout (MetaX11Display *x11_display);
+
 #endif /* META_X11_DISPLAY_PRIVATE_H */

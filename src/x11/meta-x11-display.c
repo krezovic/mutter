@@ -920,6 +920,8 @@ meta_x11_display_new (MetaDisplay *display, GError **error)
 
   x11_display->ui = meta_ui_new (xdisplay);
 
+  meta_x11_display_update_workspace_layout (x11_display);
+
   return x11_display;
 }
 
@@ -1667,4 +1669,109 @@ meta_x11_display_set_number_of_spaces_hint (MetaX11Display *x11_display,
                    XA_CARDINAL,
                    32, PropModeReplace, (guchar*) data, 1);
   meta_error_trap_pop (x11_display);
+}
+
+#define _NET_WM_ORIENTATION_HORZ 0
+#define _NET_WM_ORIENTATION_VERT 1
+
+#define _NET_WM_TOPLEFT     0
+#define _NET_WM_TOPRIGHT    1
+#define _NET_WM_BOTTOMRIGHT 2
+#define _NET_WM_BOTTOMLEFT  3
+
+void
+meta_x11_display_update_workspace_layout (MetaX11Display *x11_display)
+{
+  /* XXX: Discuss default layout */
+  gboolean vertical_layout = FALSE;
+  int n_rows = -1;
+  int n_columns = 1;
+  MetaDisplayCorner starting_corner = META_DISPLAY_TOPLEFT;
+  uint32_t *list;
+  int n_items;
+
+  if (x11_display->display->workspace_layout_overridden)
+    return;
+
+  list = NULL;
+  n_items = 0;
+
+  if (meta_prop_get_cardinal_list (x11_display,
+                                   x11_display->xroot,
+                                   x11_display->atom__NET_DESKTOP_LAYOUT,
+                                   &list, &n_items))
+    {
+      if (n_items == 3 || n_items == 4)
+        {
+          int cols, rows;
+
+          switch (list[0])
+            {
+            case _NET_WM_ORIENTATION_HORZ:
+              vertical_layout = FALSE;
+              break;
+            case _NET_WM_ORIENTATION_VERT:
+              vertical_layout = TRUE;
+              break;
+            default:
+              meta_warning ("Someone set a weird orientation in _NET_DESKTOP_LAYOUT\n");
+              break;
+            }
+
+          cols = list[1];
+          rows = list[2];
+
+          if (rows <= 0 && cols <= 0)
+            {
+              meta_warning ("Columns = %d rows = %d in _NET_DESKTOP_LAYOUT makes no sense\n", rows, cols);
+            }
+          else
+            {
+              if (rows > 0)
+                n_rows = rows;
+              else
+                n_rows = -1;
+
+              if (cols > 0)
+                n_columns = cols;
+              else
+                n_columns = -1;
+            }
+
+          if (n_items == 4)
+            {
+              switch (list[3])
+                {
+                  case _NET_WM_TOPLEFT:
+                    starting_corner = META_DISPLAY_TOPLEFT;
+                    break;
+                  case _NET_WM_TOPRIGHT:
+                    starting_corner = META_DISPLAY_TOPRIGHT;
+                    break;
+                  case _NET_WM_BOTTOMRIGHT:
+                    starting_corner = META_DISPLAY_BOTTOMRIGHT;
+                    break;
+                  case _NET_WM_BOTTOMLEFT:
+                    starting_corner = META_DISPLAY_BOTTOMLEFT;
+                    break;
+                  default:
+                    meta_warning ("Someone set a weird starting corner in _NET_DESKTOP_LAYOUT\n");
+                    break;
+                }
+            }
+        }
+      else
+        {
+          meta_warning ("Someone set _NET_DESKTOP_LAYOUT to %d integers instead of 4 "
+                        "(3 is accepted for backwards compat)\n", n_items);
+        }
+
+      meta_XFree (list);
+    }
+
+  meta_display_update_workspace_layout (x11_display->display,
+                                        starting_corner,
+                                        vertical_layout,
+                                        n_rows,
+                                        n_columns);
 }

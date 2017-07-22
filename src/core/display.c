@@ -805,7 +805,16 @@ meta_display_open (void)
       timestamp = display->x11_display->timestamp;
     }
   else
-    timestamp = meta_display_get_server_time (display);
+    {
+      timestamp = meta_display_get_server_time (display);
+
+      /* XXX: Discuss default layout */
+      meta_display_update_workspace_layout (display,
+                                            META_DISPLAY_TOPLEFT,
+                                            FALSE,
+                                            -1,
+                                            1);
+    }
 
   display->keys_grabbed = FALSE;
   meta_display_grab_keys (display);
@@ -814,8 +823,6 @@ meta_display_open (void)
   display->stack_tracker = meta_stack_tracker_new (display);
 
   reload_logical_monitors (display);
-
-  meta_display_update_workspace_layout (display);
 
   /* There must be at least one workspace at all times,
    * so create that required workspace.
@@ -3987,100 +3994,24 @@ update_num_workspaces (MetaDisplay *display,
   g_object_notify (G_OBJECT (display), "n-workspaces");
 }
 
-#define _NET_WM_ORIENTATION_HORZ 0
-#define _NET_WM_ORIENTATION_VERT 1
-
-#define _NET_WM_TOPLEFT     0
-#define _NET_WM_TOPRIGHT    1
-#define _NET_WM_BOTTOMRIGHT 2
-#define _NET_WM_BOTTOMLEFT  3
-
 void
-meta_display_update_workspace_layout (MetaDisplay *display)
+meta_display_update_workspace_layout (MetaDisplay      *display,
+                                      MetaDisplayCorner starting_corner,
+                                      gboolean          vertical_layout,
+                                      int               n_rows,
+                                      int               n_columns)
 {
-  uint32_t *list;
-  int n_items;
+  g_return_if_fail (META_IS_DISPLAY (display));
+  g_return_if_fail (n_rows > 0 || n_columns > 0);
+  g_return_if_fail (n_rows != 0 && n_columns != 0);
 
   if (display->workspace_layout_overridden)
     return;
 
-  list = NULL;
-  n_items = 0;
-
-  if (meta_prop_get_cardinal_list (display->x11_display,
-                                   display->x11_display->xroot,
-                                   display->x11_display->atom__NET_DESKTOP_LAYOUT,
-                                   &list, &n_items))
-    {
-      if (n_items == 3 || n_items == 4)
-        {
-          int cols, rows;
-
-          switch (list[0])
-            {
-            case _NET_WM_ORIENTATION_HORZ:
-              display->vertical_workspaces = FALSE;
-              break;
-            case _NET_WM_ORIENTATION_VERT:
-              display->vertical_workspaces = TRUE;
-              break;
-            default:
-              meta_warning ("Someone set a weird orientation in _NET_DESKTOP_LAYOUT\n");
-              break;
-            }
-
-          cols = list[1];
-          rows = list[2];
-
-          if (rows <= 0 && cols <= 0)
-            {
-              meta_warning ("Columns = %d rows = %d in _NET_DESKTOP_LAYOUT makes no sense\n", rows, cols);
-            }
-          else
-            {
-              if (rows > 0)
-                display->rows_of_workspaces = rows;
-              else
-                display->rows_of_workspaces = -1;
-
-              if (cols > 0)
-                display->columns_of_workspaces = cols;
-              else
-                display->columns_of_workspaces = -1;
-            }
-
-          if (n_items == 4)
-            {
-              switch (list[3])
-                {
-                  case _NET_WM_TOPLEFT:
-                    display->starting_corner = META_DISPLAY_TOPLEFT;
-                    break;
-                  case _NET_WM_TOPRIGHT:
-                    display->starting_corner = META_DISPLAY_TOPRIGHT;
-                    break;
-                  case _NET_WM_BOTTOMRIGHT:
-                    display->starting_corner = META_DISPLAY_BOTTOMRIGHT;
-                    break;
-                  case _NET_WM_BOTTOMLEFT:
-                    display->starting_corner = META_DISPLAY_BOTTOMLEFT;
-                    break;
-                  default:
-                    meta_warning ("Someone set a weird starting corner in _NET_DESKTOP_LAYOUT\n");
-                    break;
-                }
-            }
-          else
-            display->starting_corner = META_DISPLAY_TOPLEFT;
-        }
-      else
-        {
-          meta_warning ("Someone set _NET_DESKTOP_LAYOUT to %d integers instead of 4 "
-                        "(3 is accepted for backwards compat)\n", n_items);
-        }
-
-      meta_XFree (list);
-    }
+  display->vertical_workspaces = vertical_layout != FALSE;
+  display->starting_corner = starting_corner;
+  display->rows_of_workspaces = n_rows;
+  display->columns_of_workspaces = n_columns;
 
   meta_verbose ("Workspace layout rows = %d cols = %d orientation = %d starting corner = %u\n",
                 display->rows_of_workspaces,
@@ -4109,21 +4040,13 @@ meta_display_override_workspace_layout (MetaDisplay      *display,
                                         int               n_rows,
                                         int               n_columns)
 {
-  g_return_if_fail (META_IS_DISPLAY (display));
-  g_return_if_fail (n_rows > 0 || n_columns > 0);
-  g_return_if_fail (n_rows != 0 && n_columns != 0);
+  meta_display_update_workspace_layout (display,
+                                        starting_corner,
+                                        vertical_layout,
+                                        n_rows,
+                                        n_columns);
 
   display->workspace_layout_overridden = TRUE;
-  display->vertical_workspaces = vertical_layout != FALSE;
-  display->starting_corner = starting_corner;
-  display->rows_of_workspaces = n_rows;
-  display->columns_of_workspaces = n_columns;
-
-  /* In theory we should remove _NET_DESKTOP_LAYOUT from _NET_SUPPORTED at this
-   * point, but it's unlikely that anybody checks that, and it's unlikely that
-   * anybody who checks that handles changes, so we'd probably just create
-   * a race condition. And it's hard to implement with the code in set_supported_hint()
-   */
 }
 
 static void
