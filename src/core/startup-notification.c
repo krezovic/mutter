@@ -138,6 +138,11 @@ G_DEFINE_TYPE (MetaStartupNotificationSequenceX11,
 
 static void meta_startup_notification_ensure_timeout  (MetaStartupNotification *sn);
 
+static void on_x11_display_opened  (MetaDisplay *display,
+                                    MetaStartupNotification *sn);
+static void on_x11_display_closing (MetaDisplay *display,
+                                    MetaStartupNotification *sn);
+
 #endif
 
 static void
@@ -529,8 +534,13 @@ meta_startup_notification_finalize (GObject *object)
   MetaStartupNotification *sn = META_STARTUP_NOTIFICATION (object);
 
 #ifdef HAVE_STARTUP_NOTIFICATION
-  sn_monitor_context_unref (sn->sn_context);
-  sn_display_unref (sn->sn_display);
+  g_signal_handlers_disconnect_by_func (sn->display,
+                                        (gpointer)on_x11_display_opened,
+                                        sn);
+
+  g_signal_handlers_disconnect_by_func (sn->display,
+                                        (gpointer)on_x11_display_closing,
+                                        sn);
 #endif
 
   if (sn->startup_sequence_timeout)
@@ -660,6 +670,33 @@ meta_startup_notification_sn_event (SnMonitorEvent *event,
 
   sn_startup_sequence_unref (sequence);
 }
+
+static void
+on_x11_display_opened (MetaDisplay *display,
+                       MetaStartupNotification *sn)
+{
+  sn->sn_display = sn_display_new (sn->display->x11_display->xdisplay,
+                                   sn_error_trap_push,
+                                   sn_error_trap_pop);
+
+  sn->sn_context =
+    sn_monitor_context_new (sn->sn_display,
+                            meta_ui_get_screen_number (),
+                            meta_startup_notification_sn_event,
+                            sn,
+                            NULL);
+}
+
+static void
+on_x11_display_closing (MetaDisplay *display,
+                        MetaStartupNotification *sn)
+{
+  sn_monitor_context_unref (sn->sn_context);
+  sn->sn_context = NULL;
+
+  sn_display_unref (sn->sn_display);
+  sn->sn_display = NULL;
+}
 #endif
 
 static void
@@ -670,16 +707,16 @@ meta_startup_notification_constructed (GObject *object)
   g_assert (sn->display != NULL);
 
 #ifdef HAVE_STARTUP_NOTIFICATION
-  sn->sn_display = sn_display_new (sn->display->x11_display->xdisplay,
-                                   sn_error_trap_push,
-                                   sn_error_trap_pop);
-  sn->sn_context =
-    sn_monitor_context_new (sn->sn_display,
-                            meta_ui_get_screen_number (),
-                            meta_startup_notification_sn_event,
-                            sn,
-                            NULL);
+  sn->sn_display = NULL;
+  sn->sn_context = NULL;
+
+  g_signal_connect (sn->display, "x11-display-opened",
+                    G_CALLBACK (on_x11_display_opened), sn);
+
+  g_signal_connect (sn->display, "x11-display-closing",
+                    G_CALLBACK (on_x11_display_closing), sn);
 #endif
+
   sn->startup_sequences = NULL;
   sn->startup_sequence_timeout = 0;
 }
@@ -752,6 +789,9 @@ meta_startup_notification_get_sequences (MetaStartupNotification *sn)
   GSList *sequences = NULL;
 #ifdef HAVE_STARTUP_NOTIFICATION
   GSList *l;
+
+  if (!sn->sn_display)
+    return sequences;
 
   /* We return a list of SnStartupSequences here */
   for (l = sn->startup_sequences; l; l = l->next)

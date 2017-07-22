@@ -794,6 +794,10 @@ meta_display_open (void)
 
   meta_display_set_cursor (display, META_CURSOR_DEFAULT);
 
+  display->startup_notification = meta_startup_notification_get (display);
+  g_signal_connect (display->startup_notification, "changed",
+                    G_CALLBACK (on_startup_notification_changed), display);
+
   if (meta_is_x11_compositor ())
     {
       x11_display = meta_x11_display_new (display, &error);
@@ -840,10 +844,6 @@ meta_display_open (void)
                           display->x11_display->xroot,
                           display->x11_display->atom__NET_ACTIVE_WINDOW,
                           &old_active_xwindow);
-
-  display->startup_notification = meta_startup_notification_get (display);
-  g_signal_connect (display->startup_notification, "changed",
-                    G_CALLBACK (on_startup_notification_changed), display);
 
   meta_display_init_workspaces (display);
 
@@ -1010,7 +1010,6 @@ meta_display_close (MetaDisplay *display,
 
   meta_display_remove_autoraise_callback (display);
 
-  g_clear_object (&display->startup_notification);
   g_clear_object (&display->gesture_tracker);
 
   meta_stack_free (display->stack);
@@ -1054,6 +1053,8 @@ meta_display_close (MetaDisplay *display,
       g_object_run_dispose (G_OBJECT (display->x11_display));
       g_clear_object (&display->x11_display);
     }
+
+  g_clear_object (&display->startup_notification);
 
   g_object_unref (display);
   the_display = NULL;
