@@ -291,10 +291,14 @@ static void
 meta_finalize (void)
 {
   MetaDisplay *display = meta_get_display ();
+  guint32 current_time;
 
   if (display)
-    meta_display_close (display,
-                        CurrentTime); /* I doubt correct timestamps matter here */
+    {
+      current_time = meta_display_get_server_time (display);
+      meta_display_close (display,
+                          current_time); /* I doubt correct timestamps matter here */
+    }
 
 #ifdef HAVE_WAYLAND
   if (meta_is_wayland_compositor ())

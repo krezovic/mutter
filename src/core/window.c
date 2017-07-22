@@ -4693,6 +4693,7 @@ meta_window_change_workspace_by_index (MetaWindow *window,
 {
   MetaWorkspace *workspace;
   MetaDisplay   *display;
+  guint32 current_time;
 
   g_return_if_fail (!window->override_redirect);
 
@@ -4703,12 +4704,13 @@ meta_window_change_workspace_by_index (MetaWindow *window,
     }
 
   display = window->display;
+  current_time = meta_display_get_server_time (display);
 
   workspace =
     meta_display_get_workspace_by_index (display, space_index);
 
   if (!workspace && append)
-    workspace = meta_display_append_new_workspace (display, FALSE, CurrentTime);
+    workspace = meta_display_append_new_workspace (display, FALSE, current_time);
 
   if (workspace)
     meta_window_change_workspace (window, workspace);

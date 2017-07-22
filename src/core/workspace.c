@@ -1256,7 +1256,7 @@ meta_workspace_focus_default_window (MetaWorkspace *workspace,
                                      MetaWindow    *not_this_one,
                                      guint32        timestamp)
 {
-  if (timestamp == CurrentTime)
+  if (timestamp == meta_display_get_server_time (workspace->display))
     meta_warning ("CurrentTime used to choose focus window; "
                   "focus window may not be correct.\n");
 
@@ -1271,7 +1271,7 @@ meta_workspace_focus_default_window (MetaWorkspace *workspace,
           window->type != META_WINDOW_DOCK &&
           window->type != META_WINDOW_DESKTOP)
         {
-          if (timestamp == CurrentTime)
+          if (timestamp == meta_display_get_server_time (workspace->display))
             {
 
               /* We would like for this to never happen.  However, if

@@ -728,7 +728,7 @@ meta_display_open (void)
       ++i;
     }
 
-  display->current_time = CurrentTime;
+  display->current_time = meta_display_get_server_time (display);
   display->sentinel_counter = 0;
 
   display->grab_resize_timeout_id = 0;
@@ -1338,7 +1338,7 @@ meta_display_timestamp_too_old (MetaDisplay *display,
    * timestamp_too_old_or_in_future).
    */
 
-  if (*timestamp == CurrentTime)
+  if (*timestamp == meta_display_get_server_time (display))
     {
       *timestamp = meta_display_get_current_time_roundtrip (display);
       return FALSE;
@@ -4558,4 +4558,10 @@ meta_display_workspace_switched (MetaDisplay        *display,
 {
   g_signal_emit (display, display_signals[WORKSPACE_SWITCHED], 0,
                  from, to, direction);
+}
+
+guint32
+meta_display_get_server_time (MetaDisplay *display)
+{
+  return CurrentTime;
 }

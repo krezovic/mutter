@@ -482,4 +482,6 @@ void     meta_display_workspace_switched (MetaDisplay        *display,
                                           int                 to,
                                           MetaMotionDirection direction);
 
+guint32 meta_display_get_server_time (MetaDisplay *display);
+
 #endif
