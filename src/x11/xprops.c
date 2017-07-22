@@ -84,7 +84,7 @@ from The Open Group.
 #include <stdlib.h>
 
 #include "xprops.h"
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "util-private.h"
 #include "ui.h"
 #include "mutter-Xatomtype.h"

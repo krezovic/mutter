@@ -30,7 +30,7 @@
 #include <X11/extensions/Xcomposite.h>
 #include <cogl/winsys/cogl-texture-pixmap-x11.h>
 
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "window-private.h"
 #include "meta-shaped-texture-private.h"
 #include "meta-cullable.h"

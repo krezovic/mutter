@@ -42,7 +42,7 @@
 #include <clutter/clutter.h>
 
 #include <meta/main.h>
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 
 /* These structures represent the intended/persistent configuration,
    as stored in the monitors.xml file.

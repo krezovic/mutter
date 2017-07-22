@@ -24,7 +24,7 @@
 #include <config.h>
 #include "frame.h"
 #include "bell.h"
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "keybindings-private.h"
 #include "backends/x11/meta-backend-x11.h"
 #include "x11/meta-x11-display-private.h"

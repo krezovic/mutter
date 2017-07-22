@@ -31,7 +31,7 @@
 #include "keybindings-private.h"
 #include "workspace-private.h"
 #include <meta/compositor.h>
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "edge-resistance.h"
 #include "frame.h"
 #include <meta/prefs.h>

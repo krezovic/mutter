@@ -34,7 +34,7 @@
 #include <X11/Xatom.h>
 #include <X11/extensions/Xfixes.h>
 
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "meta-xwayland.h"
 #include "meta-xwayland-private.h"
 #include "meta-xwayland-selection-private.h"

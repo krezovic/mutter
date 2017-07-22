@@ -25,7 +25,7 @@
  */
 
 #include <config.h>
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <gdk/gdkx.h>

@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include <meta/display.h>
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "frame.h"
 #include <meta/window.h>
 #include <meta/meta-shaped-texture.h>

@@ -35,7 +35,7 @@
 #include <gudev/gudev.h>
 #endif
 
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "backends/meta-logical-monitor.h"
 
 typedef struct _MetaInputSettingsX11Private

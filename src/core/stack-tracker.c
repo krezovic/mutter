@@ -39,7 +39,7 @@
 #include "frame.h"
 #include "display-private.h"
 #include "stack-tracker.h"
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include <meta/util.h>
 
 #include <meta/compositor.h>

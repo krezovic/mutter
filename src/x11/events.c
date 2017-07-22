@@ -27,7 +27,7 @@
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/shape.h>
 
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "meta/meta-backend.h"
 #include "bell.h"
 #include "display-private.h"

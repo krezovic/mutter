@@ -24,7 +24,7 @@
 #include "x11/meta-x11-display-private.h"
 #include "iconcache.h"
 
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 
 #include <cairo.h>
 #include <cairo-xlib.h>

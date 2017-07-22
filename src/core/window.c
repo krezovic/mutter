@@ -32,7 +32,7 @@
 #include "edge-resistance.h"
 #include "util-private.h"
 #include "frame.h"
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "workspace-private.h"
 #include "stack.h"
 #include "keybindings-private.h"

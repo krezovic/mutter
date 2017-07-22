@@ -26,7 +26,7 @@
 
 #include "meta-window-wayland.h"
 
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include <errno.h>
 #include <string.h> /* for strerror () */
 #include "window-private.h"

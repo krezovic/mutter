@@ -39,7 +39,7 @@
 #include "core.h"
 
 #include <meta/common.h>
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include <meta/prefs.h>
 #include <meta/meta-cursor-tracker.h>
 

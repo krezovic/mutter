@@ -54,8 +54,8 @@
 #include "core/frame.h"
 #include "core/util-private.h"
 #include "core/workspace-private.h"
-#include "meta/errors.h"
 #include "meta/main.h"
+#include "meta/meta-x11-errors.h"
 
 #include "x11/events.h"
 #include "x11/group-props.h"

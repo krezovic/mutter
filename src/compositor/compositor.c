@@ -55,7 +55,7 @@
 #include <clutter/x11/clutter-x11.h>
 
 #include "core.h"
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include <meta/window.h>
 #include "compositor-private.h"
 #include <meta/compositor-mutter.h>

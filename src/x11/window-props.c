@@ -41,7 +41,7 @@
 #include "window-x11.h"
 #include "window-x11-private.h"
 #include "x11/meta-x11-display-private.h"
-#include <meta/errors.h>
+#include <meta/meta-x11-errors.h>
 #include "xprops.h"
 #include "frame.h"
 #include <meta/group.h>
