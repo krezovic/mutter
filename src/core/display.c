@@ -757,7 +757,6 @@ meta_display_open (void)
 
   display->grab_resize_timeout_id = 0;
   display->grab_have_keyboard = FALSE;
-  display->last_bell_time = 0;
 
   display->grab_op = META_GRAB_OP_NONE;
   display->grab_window = NULL;
@@ -798,6 +797,9 @@ meta_display_open (void)
   g_signal_connect (display->startup_notification, "changed",
                     G_CALLBACK (on_startup_notification_changed), display);
 
+  display->bell = NULL;
+  meta_bell_new (display);
+
   if (meta_is_x11_compositor ())
     {
       x11_display = meta_x11_display_new (display, &error);
@@ -832,8 +834,6 @@ meta_display_open (void)
    * so create that required workspace.
    */
   meta_workspace_new (display);
-
-  meta_bell_init (display);
 
   display->last_focus_time = timestamp;
   display->last_user_time = timestamp;
@@ -1054,6 +1054,7 @@ meta_display_close (MetaDisplay *display,
       g_clear_object (&display->x11_display);
     }
 
+  g_clear_object (&display->bell);
   g_clear_object (&display->startup_notification);
 
   g_object_unref (display);
@@ -2559,12 +2560,8 @@ prefs_changed_callback (MetaPreference pref,
 {
   MetaDisplay *display = data;
 
-  if (pref == META_PREF_AUDIBLE_BELL)
-    {
-      meta_bell_set_audible (display, meta_prefs_bell_is_audible ());
-    }
-  else if (pref == META_PREF_CURSOR_THEME ||
-           pref == META_PREF_CURSOR_SIZE)
+  if (pref == META_PREF_CURSOR_THEME ||
+      pref == META_PREF_CURSOR_SIZE)
     {
       meta_display_reload_cursor (display);
     }

@@ -52,6 +52,7 @@ struct _MetaX11Display
   char *screen_name;
 
   gulong cursor_updated_handler;
+  gulong is_audible_changed_handler;
   gulong monitors_changed_handler;
 
   Display *xdisplay;
@@ -112,6 +113,9 @@ struct _MetaX11Display
 
   /* Managed by group-props.c */
   MetaGroupPropHooks *group_prop_hooks;
+
+  int xkb_base_event_type;
+  guint32 last_bell_time;
 
   MetaAlarmFilter alarm_filter;
   gpointer alarm_filter_data;

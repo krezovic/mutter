@@ -38,6 +38,7 @@
 #include <unistd.h>
 
 #include <X11/Xatom.h>
+#include <X11/XKBlib.h>
 #ifdef HAVE_RANDR
 #include <X11/extensions/Xrandr.h>
 #endif
@@ -94,6 +95,11 @@ static void
 meta_x11_display_dispose (GObject *object)
 {
   MetaX11Display *x11_display = META_X11_DISPLAY (object);
+
+  if (g_signal_handler_is_connected (x11_display->display->bell,
+                                     x11_display->is_audible_changed_handler))
+    g_signal_handler_disconnect (x11_display->display->bell,
+                                 x11_display->is_audible_changed_handler);
 
   if (x11_display->ui)
     {
@@ -400,6 +406,97 @@ query_xi_extension (MetaX11Display *x11_display)
 
   if (!has_xi)
     meta_fatal ("X server doesn't have the XInput extension, version 2.2 or newer\n");
+}
+
+/*
+ * Initialises the bell subsystem. This involves intialising
+ * XKB (which, despite being a keyboard extension, is the
+ * place to look for bell notifications), then asking it
+ * to send us bell notifications, and then also switching
+ * off the audible bell if we're using a visual one ourselves.
+ *
+ * \bug There is a line of code that's never run that tells
+ * XKB to reset the bell status after we quit. Bill H said
+ * (<http://bugzilla.gnome.org/show_bug.cgi?id=99886#c12>)
+ * that XFree86's implementation is broken so we shouldn't
+ * call it, but that was in 2002. Is it working now?
+ */
+static void
+x11_bell_init (MetaX11Display *x11_display)
+{
+  int xkb_base_error_type, xkb_opcode;
+
+  if (!XkbQueryExtension (x11_display->xdisplay, &xkb_opcode,
+                          &x11_display->xkb_base_event_type,
+                          &xkb_base_error_type,
+                          NULL, NULL))
+    {
+      x11_display->xkb_base_event_type = -1;
+      meta_warning ("could not find XKB extension.");
+    }
+  else
+    {
+      unsigned int mask = XkbBellNotifyMask;
+      gboolean visual_bell_auto_reset = FALSE;
+      /* TRUE if and when non-broken version is available */
+      XkbSelectEvents (x11_display->xdisplay,
+                       XkbUseCoreKbd,
+                       XkbBellNotifyMask,
+                       XkbBellNotifyMask);
+
+      if (visual_bell_auto_reset)
+        {
+          XkbSetAutoResetControls (x11_display->xdisplay,
+                                   XkbAudibleBellMask,
+                                   &mask,
+                                   &mask);
+        }
+    }
+}
+
+/*
+ * \bug This is never called! If we had XkbSetAutoResetControls
+ * enabled in meta_x11_bell_init(), this wouldn't be a problem,
+ * but we don't.
+ */
+G_GNUC_UNUSED static void
+x11_bell_shutdown (MetaX11Display *x11_display)
+{
+  /* TODO: persist initial bell state in display, reset here */
+  XkbChangeEnabledControls (x11_display->xdisplay,
+                            XkbUseCoreKbd,
+                            XkbAudibleBellMask,
+                            XkbAudibleBellMask);
+}
+
+/*
+ * Turns the bell to audible or visual. This tells X what to do, but
+ * not Mutter; you will need to set the "visual bell" pref for that.
+ */
+static void
+x11_bell_set_audible (MetaX11Display *x11_display,
+                      gboolean is_audible)
+{
+#ifdef HAVE_LIBCANBERRA
+  /* When we are playing sounds using libcanberra support, we handle the
+   * bell whether its an audible bell or a visible bell */
+  gboolean enable_system_bell = FALSE;
+#else
+  gboolean enable_system_bell = is_audible;
+#endif /* HAVE_LIBCANBERRA */
+
+  XkbChangeEnabledControls (x11_display->xdisplay,
+                            XkbUseCoreKbd,
+                            XkbAudibleBellMask,
+                            enable_system_bell ? XkbAudibleBellMask : 0);
+}
+
+static void
+on_is_audible_changed (MetaBell       *bell,
+                       gboolean        is_audible,
+                       MetaX11Display *x11_display)
+{
+  x11_bell_set_audible (x11_display, is_audible);
 }
 
 static void
@@ -764,6 +861,7 @@ meta_x11_display_new (MetaDisplay *display, GError **error)
   x11_display->timestamp_pinging_window = None;
   x11_display->wm_sn_selection_window = None;
 
+  x11_display->last_bell_time = 0;
   x11_display->focus_serial = 0;
   x11_display->server_focus_window = None;
   x11_display->server_focus_serial = 0;
@@ -921,6 +1019,16 @@ meta_x11_display_new (MetaDisplay *display, GError **error)
   x11_display->ui = meta_ui_new (xdisplay);
 
   meta_x11_display_update_workspace_layout (x11_display);
+
+  x11_bell_init (x11_display);
+
+  x11_display->is_audible_changed_handler =
+     g_signal_connect (display->bell,
+                       "is-audible-changed",
+                       G_CALLBACK (on_is_audible_changed),
+                       x11_display);
+
+  x11_bell_set_audible (x11_display, meta_prefs_bell_is_audible ());
 
   return x11_display;
 }
