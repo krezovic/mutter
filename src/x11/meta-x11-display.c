@@ -91,10 +91,15 @@ static void on_monitors_changed (MetaDisplay    *display,
 static void update_cursor_theme (MetaX11Display *x11_display);
 static void unset_wm_check_hint (MetaX11Display *x11_display);
 
+static void prefs_changed_callback (MetaPreference pref,
+                                    void          *data);
+
 static void
 meta_x11_display_dispose (GObject *object)
 {
   MetaX11Display *x11_display = META_X11_DISPLAY (object);
+
+  meta_prefs_remove_listener (prefs_changed_callback, x11_display);
 
   if (g_signal_handler_is_connected (x11_display->display->bell,
                                      x11_display->is_audible_changed_handler))
@@ -701,6 +706,113 @@ take_manager_selection (MetaX11Display *x11_display,
   return new_owner;
 }
 
+static void
+set_active_workspace_hint (MetaDisplay    *display,
+                           MetaX11Display *x11_display)
+{
+  unsigned long data[1];
+
+  /* this is because we destroy the spaces in order,
+   * so we always end up setting a current desktop of
+   * 0 when closing a screen, so lose the current desktop
+   * on restart. By doing this we keep the current
+   * desktop on restart.
+   */
+  if (display->closing > 0)
+    return;
+
+  data[0] = meta_workspace_index (display->active_workspace);
+
+  meta_verbose ("Setting _NET_CURRENT_DESKTOP to %lu\n", data[0]);
+
+  meta_error_trap_push (x11_display);
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_CURRENT_DESKTOP,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 1);
+  meta_error_trap_pop (x11_display);
+}
+
+static void
+set_number_of_spaces_hint (MetaDisplay *display,
+                           GParamSpec  *pspec,
+                           gpointer     user_data)
+{
+  MetaX11Display *x11_display = user_data;
+  unsigned long data[1];
+
+  if (display->closing > 0)
+    return;
+
+  data[0] = meta_display_get_n_workspaces (display);
+
+  meta_verbose ("Setting _NET_NUMBER_OF_DESKTOPS to %lu\n", data[0]);
+
+  meta_error_trap_push (x11_display);
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_NUMBER_OF_DESKTOPS,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 1);
+  meta_error_trap_pop (x11_display);
+}
+
+static void
+set_showing_desktop_hint (MetaDisplay    *display,
+                          MetaX11Display *x11_display)
+{
+  unsigned long data[1];
+
+  data[0] = display->active_workspace->showing_desktop ? 1 : 0;
+
+  meta_error_trap_push (x11_display);
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_SHOWING_DESKTOP,
+                   XA_CARDINAL,
+                   32, PropModeReplace, (guchar*) data, 1);
+  meta_error_trap_pop (x11_display);
+}
+
+static void
+set_workspace_names (MetaX11Display *x11_display)
+{
+  GString *flattened;
+  int i;
+  int n_spaces;
+
+  /* flatten to nul-separated list */
+  n_spaces = meta_display_get_n_workspaces (x11_display->display);
+  flattened = g_string_new ("");
+  i = 0;
+  while (i < n_spaces)
+    {
+      const char *name;
+
+      name = meta_prefs_get_workspace_name (i);
+
+      if (name)
+        g_string_append_len (flattened, name,
+                             strlen (name) + 1);
+      else
+        g_string_append_len (flattened, "", 1);
+
+      ++i;
+    }
+
+  meta_error_trap_push (x11_display);
+  XChangeProperty (x11_display->xdisplay,
+                   x11_display->xroot,
+                   x11_display->atom__NET_DESKTOP_NAMES,
+		   x11_display->atom_UTF8_STRING,
+                   8, PropModeReplace,
+		   (unsigned char *)flattened->str, flattened->len);
+  meta_error_trap_pop (x11_display);
+
+  g_string_free (flattened, TRUE);
+}
+
 /**
  * meta_set_wm_name: (skip)
  * @wm_name: value for _NET_WM_NAME
@@ -754,6 +866,8 @@ meta_x11_display_new (MetaDisplay *display, GError **error)
   Atom wm_sn_atom;
   char buf[128];
   guint32 timestamp;
+  MetaWorkspace *current_workspace;
+  uint32_t current_workspace_index = 0;
 
   /* A list of all atom names, so that we can intern them in one go. */
   const char *atom_names[] = {
@@ -1019,6 +1133,68 @@ meta_x11_display_new (MetaDisplay *display, GError **error)
   x11_display->ui = meta_ui_new (xdisplay);
 
   meta_x11_display_update_workspace_layout (x11_display);
+
+  /* Get current workspace */
+  if (meta_prop_get_cardinal (x11_display,
+                              x11_display->xroot,
+                              x11_display->atom__NET_CURRENT_DESKTOP,
+                              &current_workspace_index))
+    {
+      meta_verbose ("Read existing _NET_CURRENT_DESKTOP = %d\n",
+                    (int) current_workspace_index);
+
+      /* Switch to the _NET_CURRENT_DESKTOP workspace */
+      current_workspace = meta_display_get_workspace_by_index (display,
+                                                               current_workspace_index);
+
+      if (current_workspace != NULL)
+        meta_workspace_activate (current_workspace, timestamp);
+    }
+  else
+    {
+      meta_verbose ("No _NET_CURRENT_DESKTOP present\n");
+    }
+
+  if (meta_prefs_get_dynamic_workspaces ())
+    {
+      int num = 0;
+      int n_items = 0;
+      uint32_t *list = NULL;
+
+      if (meta_prop_get_cardinal_list (x11_display,
+                                       x11_display->xroot,
+                                       x11_display->atom__NET_NUMBER_OF_DESKTOPS,
+                                       &list, &n_items))
+        {
+          num = list[0];
+          meta_XFree (list);
+        }
+
+        if (num > meta_display_get_n_workspaces (display))
+          meta_display_update_num_workspaces (display, timestamp, num);
+    }
+
+  set_active_workspace_hint (display, x11_display);
+
+  g_signal_connect_object (display, "active-workspace-changed",
+                           G_CALLBACK (set_active_workspace_hint),
+                           x11_display, 0);
+
+  set_number_of_spaces_hint (display, NULL, x11_display);
+
+  g_signal_connect_object (display, "notify::n-workspaces",
+                           G_CALLBACK (set_number_of_spaces_hint),
+                           x11_display, 0);
+
+  set_showing_desktop_hint (display, x11_display);
+
+  g_signal_connect_object (display, "showing-desktop-changed",
+                           G_CALLBACK (set_showing_desktop_hint),
+                           x11_display, 0);
+
+  set_workspace_names (x11_display);
+
+  meta_prefs_add_listener (prefs_changed_callback, x11_display);
 
   x11_bell_init (x11_display);
 
@@ -1675,23 +1851,6 @@ meta_x11_display_xinerama_index_to_logical_monitor (MetaX11Display *x11_display,
 }
 
 void
-meta_x11_display_update_showing_desktop_hint (MetaX11Display *x11_display)
-{
-  MetaDisplay *display = x11_display->display;
-  unsigned long data[1];
-
-  data[0] = display->active_workspace->showing_desktop ? 1 : 0;
-
-  meta_error_trap_push (x11_display);
-  XChangeProperty (x11_display->xdisplay,
-                   x11_display->xroot,
-                   x11_display->atom__NET_SHOWING_DESKTOP,
-                   XA_CARDINAL,
-                   32, PropModeReplace, (guchar*) data, 1);
-  meta_error_trap_pop (x11_display);
-}
-
-void
 meta_x11_display_update_workspace_names (MetaX11Display *x11_display)
 {
   char **names;
@@ -1725,58 +1884,6 @@ meta_x11_display_update_workspace_names (MetaX11Display *x11_display)
     }
 
   g_strfreev (names);
-}
-
-
-void
-meta_x11_display_set_active_workspace_hint (MetaX11Display *x11_display)
-{
-  MetaDisplay *display = x11_display->display;
-
-  unsigned long data[1];
-
-  /* this is because we destroy the spaces in order,
-   * so we always end up setting a current desktop of
-   * 0 when closing a screen, so lose the current desktop
-   * on restart. By doing this we keep the current
-   * desktop on restart.
-   */
-  if (display->closing > 0)
-    return;
-
-  data[0] = meta_workspace_index (display->active_workspace);
-
-  meta_verbose ("Setting _NET_CURRENT_DESKTOP to %lu\n", data[0]);
-
-  meta_error_trap_push (x11_display);
-  XChangeProperty (x11_display->xdisplay,
-                   x11_display->xroot,
-                   x11_display->atom__NET_CURRENT_DESKTOP,
-                   XA_CARDINAL,
-                   32, PropModeReplace, (guchar*) data, 1);
-  meta_error_trap_pop (x11_display);
-}
-
-void
-meta_x11_display_set_number_of_spaces_hint (MetaX11Display *x11_display,
-                                            int             n_spaces)
-{
-  unsigned long data[1];
-
-  if (x11_display->display->closing > 0)
-    return;
-
-  data[0] = n_spaces;
-
-  meta_verbose ("Setting _NET_NUMBER_OF_DESKTOPS to %lu\n", data[0]);
-
-  meta_error_trap_push (x11_display);
-  XChangeProperty (x11_display->xdisplay,
-                   x11_display->xroot,
-                   x11_display->atom__NET_NUMBER_OF_DESKTOPS,
-                   XA_CARDINAL,
-                   32, PropModeReplace, (guchar*) data, 1);
-  meta_error_trap_pop (x11_display);
 }
 
 #define _NET_WM_ORIENTATION_HORZ 0
@@ -1882,4 +1989,16 @@ meta_x11_display_update_workspace_layout (MetaX11Display *x11_display)
                                         vertical_layout,
                                         n_rows,
                                         n_columns);
+}
+
+static void
+prefs_changed_callback (MetaPreference pref,
+                        void          *data)
+{
+  MetaX11Display *x11_display = data;
+
+  if (pref == META_PREF_WORKSPACE_NAMES)
+    {
+      set_workspace_names (x11_display);
+    }
 }

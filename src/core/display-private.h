@@ -486,6 +486,10 @@ void     meta_display_workspace_switched (MetaDisplay        *display,
                                           int                 to,
                                           MetaMotionDirection direction);
 
+void meta_display_update_num_workspaces (MetaDisplay *display,
+                                         guint32      timestamp,
+                                         int          new_num);
+
 guint32 meta_display_get_server_time (MetaDisplay *display);
 
 void meta_display_x11_display_opened  (MetaDisplay *display);
