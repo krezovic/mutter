@@ -814,6 +814,9 @@ meta_display_open (void)
   display->bell = NULL;
   meta_bell_new (display);
 
+  display->stack = meta_stack_new (display);
+  display->stack_tracker = meta_stack_tracker_new (display);
+
   /* XXX: Discuss default layout */
   /* This will be overriden using _NET_DESKTOP_LAYOUT in
    * meta_x11_display_new (), if it's specified */
@@ -830,6 +833,8 @@ meta_display_open (void)
 
   meta_display_init_workspaces (display);
 
+  reload_logical_monitors (display);
+
   if (meta_is_x11_compositor ())
     {
       x11_display = meta_x11_display_new (display, &error);
@@ -839,21 +844,14 @@ meta_display_open (void)
       meta_display_x11_display_opened (display);
 
       timestamp = display->x11_display->timestamp;
+
+      display->keys_grabbed = FALSE;
+      meta_display_grab_keys (display);
     }
   else
     {
       timestamp = meta_display_get_server_time (display);
-
-
     }
-
-  display->keys_grabbed = FALSE;
-  meta_display_grab_keys (display);
-
-  display->stack = meta_stack_new (display);
-  display->stack_tracker = meta_stack_tracker_new (display);
-
-  reload_logical_monitors (display);
 
   display->last_focus_time = timestamp;
   display->last_user_time = timestamp;
@@ -1033,7 +1031,8 @@ meta_display_close (MetaDisplay *display,
   meta_stack_free (display->stack);
   meta_stack_tracker_free (display->stack_tracker);
 
-  meta_display_ungrab_keys (display);
+  if (meta_is_x11_compositor ())
+    meta_display_ungrab_keys (display);
 
   if (display->focus_timeout_id)
     g_source_remove (display->focus_timeout_id);

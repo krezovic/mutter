@@ -1148,11 +1148,15 @@ prefs_changed_callback (MetaPreference pref,
   switch (pref)
     {
     case META_PREF_KEYBINDINGS:
-      ungrab_key_bindings (display);
+      if (meta_is_x11_compositor ())
+        ungrab_key_bindings (display);
+
       rebuild_key_binding_table (keys);
       rebuild_special_bindings (keys);
       reload_combos (keys);
-      grab_key_bindings (display);
+
+      if (meta_is_x11_compositor ())
+        grab_key_bindings (display);
       break;
     case META_PREF_MOUSE_BUTTON_MODS:
       {
