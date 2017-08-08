@@ -239,7 +239,6 @@ struct _MetaDisplay
 
   GSList *startup_sequences;
 
-  guint work_area_later;
   guint check_fullscreen_later;
 
   guint keys_grabbed : 1;
@@ -442,7 +441,6 @@ void meta_display_hide_tile_preview   (MetaDisplay *display);
 gboolean meta_display_apply_startup_properties (MetaDisplay *display,
                                                 MetaWindow *window);
 
-void meta_display_queue_workarea_recalc  (MetaDisplay *display);
 void meta_display_queue_check_fullscreen (MetaDisplay *display);
 
 MetaWindow *meta_display_get_pointer_window (MetaDisplay *display,

@@ -753,7 +753,6 @@ meta_display_open (void)
   display->current_cursor = -1; /* invalid/unset */
   display->tile_preview_timeout_id = 0;
   display->check_fullscreen_later = 0;
-  display->work_area_later = 0;
 
   display->mouse_mode = TRUE; /* Only relevant for mouse or sloppy focus */
   display->allow_terminal_deactivation = TRUE; /* Only relevant for when a
@@ -1042,8 +1041,6 @@ meta_display_close (MetaDisplay *display,
     g_source_remove (display->tile_preview_timeout_id);
   display->tile_preview_timeout_id = 0;
 
-  if (display->work_area_later != 0)
-    meta_later_remove (display->work_area_later);
   if (display->check_fullscreen_later != 0)
     meta_later_remove (display->check_fullscreen_later);
 
@@ -3351,74 +3348,6 @@ meta_display_apply_startup_properties (MetaDisplay *display,
   return FALSE;
 }
 
-static void
-set_work_area_hint (MetaDisplay *display)
-{
-  MetaX11Display *x11_display = display->x11_display;
-  int num_workspaces;
-  GList *l;
-  unsigned long *data, *tmp;
-  MetaRectangle area;
-
-  num_workspaces = meta_display_get_n_workspaces (display);
-  data = g_new (unsigned long, num_workspaces * 4);
-  tmp = data;
-
-  for (l = display->workspaces; l != NULL; l = l->next)
-    {
-      MetaWorkspace *workspace = l->data;
-
-      meta_workspace_get_work_area_all_monitors (workspace, &area);
-      tmp[0] = area.x;
-      tmp[1] = area.y;
-      tmp[2] = area.width;
-      tmp[3] = area.height;
-
-      tmp += 4;
-    }
-
-  meta_error_trap_push (x11_display);
-  XChangeProperty (x11_display->xdisplay,
-                   x11_display->xroot,
-		   x11_display->atom__NET_WORKAREA,
-		   XA_CARDINAL, 32, PropModeReplace,
-		   (guchar*) data, num_workspaces*4);
-  meta_error_trap_pop (x11_display);
-
-  g_free (data);
-
-  g_signal_emit (display, display_signals[WORKAREAS_CHANGED], 0);
-}
-
-static gboolean
-set_work_area_later_func (MetaDisplay *display)
-{
-  meta_topic (META_DEBUG_WORKAREA,
-              "Running work area hint computation function\n");
-
-  display->work_area_later = 0;
-
-  set_work_area_hint (display);
-
-  return FALSE;
-}
-
-void
-meta_display_queue_workarea_recalc (MetaDisplay *display)
-{
-  /* Recompute work area later before redrawing */
-  if (display->work_area_later == 0)
-    {
-      meta_topic (META_DEBUG_WORKAREA,
-                  "Adding work area hint computation function\n");
-      display->work_area_later =
-        meta_later_add (META_LATER_BEFORE_REDRAW,
-                        (GSourceFunc) set_work_area_later_func,
-                        display,
-                        NULL);
-    }
-}
-
 static gboolean
 check_fullscreen_func (gpointer data)
 {
@@ -3836,7 +3765,7 @@ meta_display_remove_workspace (MetaDisplay   *display,
       meta_workspace_index_changed (w);
     }
 
-  meta_display_queue_workarea_recalc (display);
+  g_signal_emit (display, display_signals[WORKAREAS_CHANGED], 0);
 
   g_signal_emit (display, display_signals[WORKSPACE_REMOVED], 0, index);
   g_object_notify (G_OBJECT (display), "n-workspaces");
@@ -3877,7 +3806,7 @@ meta_display_append_new_workspace (MetaDisplay *display,
   if (!meta_prefs_get_dynamic_workspaces ())
     meta_prefs_set_num_workspaces (new_num);
 
-  meta_display_queue_workarea_recalc (display);
+  g_signal_emit (display, display_signals[WORKAREAS_CHANGED], 0);
 
   g_signal_emit (display, display_signals[WORKSPACE_ADDED],
                  0, meta_workspace_index (w));
@@ -3950,7 +3879,7 @@ meta_display_update_num_workspaces (MetaDisplay *display,
   for (i = old_num; i < new_num; i++)
     meta_workspace_new (display);
 
-  meta_display_queue_workarea_recalc (display);
+  g_signal_emit (display, display_signals[WORKAREAS_CHANGED], 0);
 
   for (i = old_num; i < new_num; i++)
     g_signal_emit (display, display_signals[WORKSPACE_ADDED], 0, i);
