@@ -862,7 +862,8 @@ meta_display_open (void)
                           display->x11_display->atom__NET_ACTIVE_WINDOW,
                           &old_active_xwindow);
 
-  meta_backend_x11_display_opened (meta_get_backend ());
+  if (meta_is_x11_compositor ())
+    meta_backend_x11_display_opened (meta_get_backend ());
 
   enable_compositor (display);
 

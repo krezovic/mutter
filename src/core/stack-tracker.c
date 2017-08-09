@@ -476,9 +476,10 @@ copy_stack (GArray *stack)
 }
 
 static void
-query_xserver_stack (MetaStackTracker *tracker)
+query_xserver_stack (MetaDisplay      *display,
+                     MetaStackTracker *tracker)
 {
-  MetaX11Display *x11_display = tracker->display->x11_display;
+  MetaX11Display *x11_display = display->x11_display;
   Window ignored1, ignored2;
   Window *children;
   guint n_children;
@@ -511,9 +512,10 @@ meta_stack_tracker_new (MetaDisplay *display)
   tracker->verified_stack = g_array_new (FALSE, FALSE, sizeof (guint64));
   tracker->unverified_predictions = g_queue_new ();
 
-  g_signal_connect_object (display, "x11-display-opened",
-                           G_CALLBACK (query_xserver_stack),
-                           tracker, G_CONNECT_SWAPPED);
+  g_signal_connect (display,
+                    "x11-display-opened",
+                    G_CALLBACK (query_xserver_stack),
+                    tracker);
 
   meta_stack_tracker_dump (tracker);
 
@@ -533,6 +535,10 @@ meta_stack_tracker_free (MetaStackTracker *tracker)
   g_queue_foreach (tracker->unverified_predictions, (GFunc)meta_stack_op_free, NULL);
   g_queue_free (tracker->unverified_predictions);
   tracker->unverified_predictions = NULL;
+
+  g_signal_handlers_disconnect_by_func (tracker->display,
+                                        (gpointer)query_xserver_stack,
+                                        tracker);
 
   g_free (tracker);
 }
