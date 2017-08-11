@@ -764,7 +764,7 @@ meta_workspace_invalidate_work_area (MetaWorkspace *workspace)
 
   g_list_free (windows);
 
-  meta_display_queue_workarea_recalc (workspace->display);
+  g_signal_emit_by_name (workspace->display, "workareas-changed");
 }
 
 static MetaStrut *
