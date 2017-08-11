@@ -209,7 +209,6 @@ meta_screen_new (MetaDisplay *display,
   MetaScreen *screen;
   int number;
   Window xroot = meta_x11_display_get_xroot (display->x11_display);
-  Display *xdisplay = meta_x11_display_get_xdisplay (display->x11_display);
 
   number = meta_ui_get_screen_number ();
 
@@ -239,11 +238,6 @@ meta_screen_new (MetaDisplay *display,
    * so create that required workspace.
    */
   meta_workspace_new (screen);
-
-  screen->keys_grabbed = FALSE;
-  meta_screen_grab_keys (screen);
-
-  screen->ui = meta_ui_new (xdisplay);
 
   meta_prefs_add_listener (prefs_changed_callback, screen);
 
@@ -303,10 +297,6 @@ meta_screen_free (MetaScreen *screen,
                                         screen);
 
   meta_prefs_remove_listener (prefs_changed_callback, screen);
-
-  meta_screen_ungrab_keys (screen);
-
-  meta_ui_free (screen->ui);
 
   g_object_unref (screen);
 }
@@ -593,29 +583,6 @@ update_num_workspaces (MetaScreen *screen,
     g_signal_emit (screen, screen_signals[WORKSPACE_ADDED], 0, i);
 
   g_object_notify (G_OBJECT (screen), "n-workspaces");
-}
-
-MetaWindow*
-meta_screen_get_mouse_window (MetaScreen  *screen,
-                              MetaWindow  *not_this_one)
-{
-  MetaBackend *backend = meta_get_backend ();
-  MetaCursorTracker *cursor_tracker = meta_backend_get_cursor_tracker (backend);
-  MetaWindow *window;
-  int x, y;
-
-  if (not_this_one)
-    meta_topic (META_DEBUG_FOCUS,
-                "Focusing mouse window excluding %s\n", not_this_one->desc);
-
-  meta_cursor_tracker_get_pointer (cursor_tracker, &x, &y, NULL);
-
-  window = meta_stack_get_default_focus_window_at_point (screen->display->stack,
-                                                         screen->active_workspace,
-                                                         not_this_one,
-                                                         x, y);
-
-  return window;
 }
 
 #define _NET_WM_ORIENTATION_HORZ 0
