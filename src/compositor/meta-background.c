@@ -21,6 +21,7 @@
 #include <meta/util.h>
 #include <meta/meta-background.h>
 #include <meta/meta-background-image.h>
+#include <meta/meta-monitor-manager.h>
 #include "meta-background-private.h"
 #include "cogl-utils.h"
 
@@ -129,8 +130,8 @@ free_wallpaper_texture (MetaBackground *self)
 }
 
 static void
-on_monitors_changed (MetaDisplay    *display,
-                     MetaBackground *self)
+on_monitors_changed (MetaMonitorManager *manager,
+                     MetaBackground     *self)
 {
   MetaBackgroundPrivate *priv = self->priv;
 
@@ -143,7 +144,7 @@ on_monitors_changed (MetaDisplay    *display,
     {
       int i;
 
-      priv->n_monitors = meta_display_get_n_monitors (display);
+      priv->n_monitors = meta_display_get_n_monitors (priv->display);
       priv->monitors = g_new0 (MetaBackgroundMonitor, priv->n_monitors);
 
       for (i = 0; i < priv->n_monitors; i++)
@@ -156,23 +157,18 @@ set_display (MetaBackground *self,
              MetaDisplay    *display)
 {
   MetaBackgroundPrivate *priv = self->priv;
+  MetaMonitorManager *manager = meta_monitor_manager_get ();
 
-  if (priv->display != NULL)
-    {
-      g_signal_handlers_disconnect_by_func (priv->display,
-                                            (gpointer)on_monitors_changed,
-                                            self);
-    }
+  g_signal_handlers_disconnect_by_func (manager,
+                                        (gpointer)on_monitors_changed,
+                                        self);
 
   priv->display = display;
 
-  if (priv->display != NULL)
-    {
-      g_signal_connect (priv->display, "monitors-changed",
-                        G_CALLBACK (on_monitors_changed), self);
-    }
+  g_signal_connect (manager, "monitors-changed",
+                    G_CALLBACK (on_monitors_changed), self);
 
-  on_monitors_changed (priv->display, self);
+  on_monitors_changed (manager, self);
 }
 
 static void

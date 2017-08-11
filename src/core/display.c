@@ -144,7 +144,6 @@ enum
   IN_FULLSCREEN_CHANGED,
   SHOWING_DESKTOP_CHANGED,
   STARTUP_SEQUENCE_CHANGED,
-  MONITORS_CHANGED,
   RESTACKED,
   WORKAREAS_CHANGED,
   LAST_SIGNAL
@@ -517,14 +516,6 @@ meta_display_class_init (MetaDisplayClass *klass)
                   NULL, NULL, NULL,
                   G_TYPE_NONE, 1, G_TYPE_POINTER);
 
-  display_signals[MONITORS_CHANGED] =
-    g_signal_new ("monitors-changed",
-		  G_TYPE_FROM_CLASS (object_class),
-		  G_SIGNAL_RUN_LAST,
-		  G_STRUCT_OFFSET (MetaDisplayClass, monitors_changed),
-                  NULL, NULL, NULL,
-		  G_TYPE_NONE, 0);
-
   display_signals[RESTACKED] =
     g_signal_new ("restacked",
                   G_TYPE_FROM_CLASS (object_class),
@@ -746,7 +737,6 @@ meta_display_open (void)
   display->focus_window = NULL;
   display->x11_display = NULL;
 
-  display->rect.x = display->rect.y = 0;
   display->current_cursor = -1; /* invalid/unset */
   display->tile_preview_timeout_id = 0;
   display->check_fullscreen_later = 0;
@@ -796,10 +786,6 @@ meta_display_open (void)
   manager = meta_monitor_manager_get ();
   g_signal_connect (manager, "monitors-changed",
                     G_CALLBACK (on_monitors_changed), display);
-
-  meta_monitor_manager_get_screen_size (manager,
-                                        &display->rect.width,
-                                        &display->rect.height);
 
   meta_display_set_cursor (display, META_CURSOR_DEFAULT);
 
@@ -2759,11 +2745,20 @@ meta_display_get_size (MetaDisplay *display,
                        int         *width,
                        int         *height)
 {
+  MetaMonitorManager *manager;
+  int display_width, display_height;
+
+  manager = meta_monitor_manager_get ();
+
+  meta_monitor_manager_get_screen_size (manager,
+                                        &display_width,
+                                        &display_height);
+
   if (width != NULL)
-    *width = display->rect.width;
+    *width = display_width;
 
   if (height != NULL)
-    *height = display->rect.height;
+    *height = display_height;
 }
 
 /**
@@ -3074,10 +3069,6 @@ on_monitors_changed (MetaMonitorManager *manager,
   MetaBackend *backend;
   MetaCursorRenderer *cursor_renderer;
 
-  meta_monitor_manager_get_screen_size (manager,
-                                        &display->rect.width,
-                                        &display->rect.height);
-
   reload_logical_monitors (display);
 
   /* Fix up monitor for all windows on this display */
@@ -3094,8 +3085,6 @@ on_monitors_changed (MetaMonitorManager *manager,
   backend = meta_get_backend ();
   cursor_renderer = meta_backend_get_cursor_renderer (backend);
   meta_cursor_renderer_force_update (cursor_renderer);
-
-  g_signal_emit (display, display_signals[MONITORS_CHANGED], 0);
 }
 
 void
