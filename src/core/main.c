@@ -602,12 +602,6 @@ meta_init (void)
     meta_fatal ("Can't specify both SM save file and SM client id\n");
 
   meta_main_loop = g_main_loop_new (NULL, FALSE);
-
-  if (meta_is_x11_compositor ())
-    {
-      meta_ui_init ();
-      meta_restart_init ();
-    }
 }
 
 /**

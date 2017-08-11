@@ -681,7 +681,7 @@ on_x11_display_opened (MetaDisplay *display,
 
   sn->sn_context =
     sn_monitor_context_new (sn->sn_display,
-                            meta_ui_get_screen_number (),
+                            meta_x11_display_get_screen_number (sn->display->x11_display),
                             meta_startup_notification_sn_event,
                             sn,
                             NULL);
