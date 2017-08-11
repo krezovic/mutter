@@ -3648,7 +3648,6 @@ meta_display_get_pointer_window (MetaDisplay *display,
 void
 meta_display_init_workspaces (MetaDisplay *display)
 {
-  guint32 timestamp;
   int num;
 
   g_return_if_fail (META_IS_DISPLAY (display));
@@ -3660,11 +3659,9 @@ meta_display_init_workspaces (MetaDisplay *display)
   else
     num = meta_prefs_get_num_workspaces ();
 
-  timestamp = meta_display_get_current_time_roundtrip (display);
+  meta_display_update_num_workspaces (display, META_CURRENT_TIME, num);
 
-  meta_display_update_num_workspaces (display, timestamp, num);
-
-  meta_workspace_activate (display->workspaces->data, timestamp);
+  meta_workspace_activate (display->workspaces->data, META_CURRENT_TIME);
 }
 
 int
