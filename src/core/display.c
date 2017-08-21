@@ -117,6 +117,8 @@ G_DEFINE_TYPE(MetaDisplay, meta_display, G_TYPE_OBJECT);
 enum
 {
   CURSOR_UPDATED,
+  X11_DISPLAY_OPENED,
+  X11_DISPLAY_CLOSING,
   OVERLAY_KEY,
   ACCELERATOR_ACTIVATED,
   MODIFIERS_ACCELERATOR_ACTIVATED,
@@ -222,6 +224,22 @@ meta_display_class_init (MetaDisplayClass *klass)
 
   display_signals[CURSOR_UPDATED] =
     g_signal_new ("cursor-updated",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0,
+                  NULL, NULL, NULL,
+                  G_TYPE_NONE, 0);
+
+  display_signals[X11_DISPLAY_OPENED] =
+    g_signal_new ("x11-display-opened",
+                  G_TYPE_FROM_CLASS (klass),
+                  G_SIGNAL_RUN_LAST,
+                  0,
+                  NULL, NULL, NULL,
+                  G_TYPE_NONE, 0);
+
+  display_signals[X11_DISPLAY_CLOSING] =
+    g_signal_new ("x11-display-closing",
                   G_TYPE_FROM_CLASS (klass),
                   G_SIGNAL_RUN_LAST,
                   0,
@@ -581,21 +599,24 @@ enable_compositor (MetaDisplay *display)
 {
   MetaX11Display *x11_display = display->x11_display;
 
-  if (!META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ||
-      !META_X11_DISPLAY_HAS_DAMAGE (x11_display))
+  if (x11_display)
     {
-      meta_warning ("Missing %s extension required for compositing",
-                    !META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ?
-                    "composite" : "damage");
-      return;
-    }
+      if (!META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ||
+          !META_X11_DISPLAY_HAS_DAMAGE (x11_display))
+        {
+          meta_warning ("Missing %s extension required for compositing",
+                        !META_X11_DISPLAY_HAS_COMPOSITE (x11_display) ?
+                        "composite" : "damage");
+          return;
+        }
 
-  int version = (x11_display->composite_major_version * 10) +
-                 x11_display->composite_minor_version;
-  if (version < 3)
-    {
-      meta_warning ("Your version of COMPOSITE is too old.");
-      return;
+      int version = (x11_display->composite_major_version * 10) +
+                     x11_display->composite_minor_version;
+      if (version < 3)
+        {
+          meta_warning ("Your version of COMPOSITE is too old.");
+          return;
+        }
     }
 
   if (!display->compositor)
@@ -728,7 +749,7 @@ meta_display_open (void)
       ++i;
     }
 
-  display->current_time = CurrentTime;
+  display->current_time = META_CURRENT_TIME;
   display->sentinel_counter = 0;
 
   display->grab_resize_timeout_id = 0;
@@ -773,6 +794,7 @@ meta_display_open (void)
   x11_display = meta_x11_display_new (display, &error);
   g_assert (x11_display != NULL); /* Required, for now */
   display->x11_display = x11_display;
+  g_signal_emit (display, display_signals[X11_DISPLAY_OPENED], 0);
 
   timestamp = display->x11_display->timestamp;
 
@@ -808,7 +830,8 @@ meta_display_open (void)
 
   enable_compositor (display);
 
-  meta_x11_display_create_guard_window (display->x11_display);
+  if (display->x11_display)
+    meta_x11_display_create_guard_window (display->x11_display);
 
   /* Set up touch support */
   display->gesture_tracker = meta_gesture_tracker_new ();
@@ -831,7 +854,7 @@ meta_display_open (void)
       else
         meta_x11_display_focus_the_no_focus_window (display->x11_display, timestamp);
     }
-  else
+  else if (display->x11_display)
     meta_x11_display_focus_the_no_focus_window (display->x11_display, timestamp);
 
   meta_idle_monitor_init_dbus ();
@@ -1004,6 +1027,7 @@ meta_display_close (MetaDisplay *display,
 
   if (display->x11_display)
     {
+      g_signal_emit (display, display_signals[X11_DISPLAY_CLOSING], 0);
       g_object_run_dispose (G_OBJECT (display->x11_display));
       g_clear_object (&display->x11_display);
     }
@@ -1161,7 +1185,11 @@ meta_display_get_current_time (MetaDisplay *display)
 guint32
 meta_display_get_current_time_roundtrip (MetaDisplay *display)
 {
-  return meta_x11_display_get_current_time_roundtrip (display->x11_display);
+  if (meta_is_wayland_compositor ())
+    /* Xwayland uses monotonic clock, so lets try this here */
+    return (guint32) (g_get_monotonic_time () / 1000);
+  else
+    return meta_x11_display_get_current_time_roundtrip (display->x11_display);
 }
 
 /**
@@ -1331,7 +1359,7 @@ meta_display_timestamp_too_old (MetaDisplay *display,
    * timestamp_too_old_or_in_future).
    */
 
-  if (*timestamp == CurrentTime)
+  if (*timestamp == META_CURRENT_TIME)
     {
       *timestamp = meta_display_get_current_time_roundtrip (display);
       return FALSE;
